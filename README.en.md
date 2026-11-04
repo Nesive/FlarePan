@@ -26,6 +26,16 @@ file, 500 MB per day, 5 GB total, and new uploads expire after 24 hours.
 Do not store anything important on the demo. DAV works with the demo
 account, with write access under the `demo/` directory.
 
+## Screenshots
+
+Screenshots from the live demo (Starship skin):
+
+![Desktop home](screenshots/front-desktop.png)
+
+![Mobile home](screenshots/front-mobile.png)
+
+![Image lightbox viewer](screenshots/viewer-image.png)
+
 ## Lineage and thanks
 
 This project is a further development of open-source file libraries,

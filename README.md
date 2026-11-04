@@ -23,6 +23,16 @@ Pan 是跑在 Cloudflare Workers + R2 + D1 上的自托管文件库：文件夹�
 总量 5GB，新上传 24 小时后过期；请勿在演示站存放重要文件。
 DAV 可用 demo 账号登录，写权限在 `demo/` 目录下。
 
+## 截图
+
+以下截图来自演示站（星际航行者皮肤）：
+
+![桌面端首页](screenshots/front-desktop.png)
+
+![手机端首页](screenshots/front-mobile.png)
+
+![图片灯箱查看器](screenshots/viewer-image.png)
+
 ## 谱系与致谢
 
 本项目是开源网盘的再开发，MIT 协议保留：
