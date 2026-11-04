@@ -274,6 +274,23 @@
       :renderer="pdfRenderer"
       :player-visible="!!playerQueue.length"
       @close="closePdf" />
+    <TextPreview
+      v-if="textUrl"
+      :url="textUrl"
+      :name="textName"
+      :is-markdown="textIsMarkdown"
+      :size="textSize"
+      :player-visible="!!playerQueue.length"
+      @close="closeText" />
+    <ImagePreview
+      v-if="imageList.length"
+      :images="imageList"
+      :index="imageIndex"
+      @close="closeImage" />
+    <InfoPreview
+      v-if="infoFile"
+      :file="infoFile"
+      @close="closeInfo" />
     <Dialog v-model="showAudioPrompt">
       <div class="audio-prompt">
         <div class="audio-prompt-title">播放音频</div>
@@ -303,6 +320,9 @@ import Footer from './Footer.vue';
 import AudioPlayer from './AudioPlayer.vue';
 import PdfPreview from './PdfPreview.vue';
 import VideoPlayer from './VideoPlayer.vue';
+import TextPreview from './TextPreview.vue';
+import ImagePreview from './ImagePreview.vue';
+import InfoPreview from './InfoPreview.vue';
 import Admin from './Admin.vue';
 
 // 路径归一：去掉尾部多余斜杠。短链目标曾多带一个 "/"（见 shorten 归一化），
@@ -340,7 +360,7 @@ export default {
     // 前端版本戳：每次部署同步 bump（见 assets/version.json）。
     // 手机浏览器常把标签页留存数日不刷新，旧代码会让视频继续走新标签页；
     // 已加载的旧页在切回可见时发现版本不一致就自动重载，之后不再有旧代码。
-    appVersion: '20261104-07',
+    appVersion: '20261104-09',
     // 播放器挂在 App 根节点，文件夹切换、前进后退、PDF 浮层都不卸载它。
     playerQueue: [],
     playerStartIndex: 0,
@@ -361,6 +381,16 @@ export default {
     pdfUrl: '',
     pdfName: '',
     pdfRenderer: 'iframe',
+    // 站内文本 / Markdown 查看器（见 TextPreview）。
+    textUrl: '',
+    textName: '',
+    textIsMarkdown: false,
+    textSize: 0,
+    // 站内图片灯箱：同一文件夹的图片可切换。
+    imageList: [],
+    imageIndex: 0,
+    // 兜底卡片：无专属查看器的格式点开落到这里，站内给下载。
+    infoFile: null,
   }),
 
   computed: {
@@ -611,10 +641,6 @@ export default {
     },
 
 
-    preview(filePath) {
-      window.open(filePath);
-    },
-
     // 旧标签页自救：只在创建与切回可见时查一次，不轮询；
     // 取不到 version.json（老部署）时什么都不做，绝不循环重载。
     checkAppVersion() {
@@ -628,7 +654,9 @@ export default {
         .catch(() => {});
     },
 
-    // 文件点开分流：视频走站内小窗，音频走站内播放器，PDF 走站内浮层，其余保持原样。
+    // 文件点开分流：视频走站内小窗，音频走站内播放器，PDF 走站内浮层，
+    // 图片走站内灯箱，文本 / Markdown 走站内阅读器，其余走站内兜底卡片；
+    // 任何格式都不再新标签页打开。
     isVideoFile(file) {
       const ct = (file.httpMetadata && file.httpMetadata.contentType) || '';
       if (ct.startsWith('video/')) return true;
@@ -650,6 +678,21 @@ export default {
       return /\.pdf$/i.test(file.key);
     },
 
+    isImageFile(file) {
+      const ct = (file.httpMetadata && file.httpMetadata.contentType) || '';
+      if (ct.startsWith('image/')) return true;
+      return /\.(png|jpe?g|gif|webp|svg|bmp|avif|ico|tiff?)$/i.test(file.key);
+    },
+
+    isMarkdownFile(file) {
+      return /\.(md|markdown)$/i.test(file.key);
+    },
+
+    isTextFile(file) {
+      // .html 也走文本源查看：绝不 iframe 渲染用户 HTML（站内脚本注入风险）。
+      return /\.(txt|md|markdown|json|json5|csv|tsv|log|xml|html|htm|css|js|mjs|cjs|ts|jsx|tsx|py|rb|go|rs|java|c|h|cpp|hpp|cc|cs|php|sh|bash|zsh|yml|yaml|toml|ini|conf|cfg|env|sql|diff|patch|tex|rst|adoc|text|srt|vtt)$/i.test(file.key);
+    },
+
     openFile(file) {
       if (this.isVideoFile(file)) {
         this.openVideo(file);
@@ -664,10 +707,82 @@ export default {
         this.openPdf(file);
         return;
       }
-      this.preview(`/raw/${file.key}`);
+      if (this.isImageFile(file)) {
+        this.openImage(file);
+        return;
+      }
+      if (this.isTextFile(file)) {
+        this.openText(file);
+        return;
+      }
+      this.openInfo(file);
+    },
+
+    openText(file) {
+      this.closeVideo();
+      this.closeImage();
+      this.closeInfo();
+      this.textName = file.key.split('/').pop();
+      this.textIsMarkdown = this.isMarkdownFile(file);
+      this.textSize = file.size || 0;
+      this.textUrl = `/raw/${file.key}`;
+    },
+
+    closeText() {
+      this.textUrl = '';
+      this.textName = '';
+      this.textIsMarkdown = false;
+      this.textSize = 0;
+    },
+
+    openImage(file) {
+      this.closeVideo();
+      this.closeText();
+      this.closeInfo();
+      const images = this.files.filter((f) => this.isImageFile(f)).map((f) => ({
+        key: f.key,
+        name: f.key.split('/').pop(),
+        url: `/raw/${f.key}`,
+      }));
+      let idx = images.findIndex((im) => im.key === file.key);
+      if (idx < 0) {
+        images.unshift({
+          key: file.key,
+          name: file.key.split('/').pop(),
+          url: `/raw/${file.key}`,
+        });
+        idx = 0;
+      }
+      this.imageList = images;
+      this.imageIndex = idx;
+    },
+
+    closeImage() {
+      this.imageList = [];
+      this.imageIndex = 0;
+    },
+
+    openInfo(file) {
+      this.closeVideo();
+      this.closeText();
+      this.closeImage();
+      this.infoFile = {
+        key: file.key,
+        name: file.key.split('/').pop(),
+        sizeText: this.formatSize(file.size),
+        type: (file.httpMetadata && file.httpMetadata.contentType) || '',
+        url: `/raw/${file.key}`,
+      };
+    },
+
+    closeInfo() {
+      this.infoFile = null;
     },
 
     openVideo(file) {
+      this.closeText();
+      this.closeImage();
+      this.closeInfo();
       this.videoName = file.key.split('/').pop();
       this.videoKey = file.key;
       // ?play=1 换缓存键：绕过浏览器里已有的旧 octet-stream 缓存条目
@@ -821,6 +936,9 @@ export default {
     AudioPlayer,
     PdfPreview,
     VideoPlayer,
+    TextPreview,
+    ImagePreview,
+    InfoPreview,
   },
 };
 </script>
