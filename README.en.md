@@ -28,19 +28,19 @@ account, with write access under the `demo/` directory.
 
 ## Screenshots
 
-![Feature tour](screenshots/showcase-en.gif)
+![Feature tour](screenshots/showcase-en-flarepan.gif)
 
 A real feature tour from the live demo: Starship and Original themes, instant skin switching, planet favicon, multi-account and folder-level permissions, WebDAV, the short-link master switch, in-site Markdown viewing, the bottom audio player, the centered video window, and the image lightbox.
 
 Feature demo video (cut from real screenshots, 94s): [pan-demo.mp4](screenshots/pan-demo.mp4)
 
-![Mobile Starship](screenshots/front-mobile.png)
+![Mobile Starship](screenshots/front-mobile-flarepan.png)
 
-![Mobile Original](screenshots/front-mobile-original.png)
+![Mobile Original](screenshots/front-mobile-original-flarepan.png)
 
 Mobile is fully featured too: search, folders, file lists and viewers all work, and both themes switch the same way on phones.
 
-![Tab planet favicon](screenshots/favicon-tab.png)
+![Tab planet favicon](screenshots/favicon-tab-flarepan.png)
 
 The favicon follows the skin: a transparent planet icon with no white or square background on the browser tab.
 

@@ -25,19 +25,19 @@ DAV 可用 demo 账号登录，写权限在 `demo/` 目录下。
 
 ## 截图
 
-![功能轮播](screenshots/showcase-zh.gif)
+![功能轮播](screenshots/showcase-zh-flarepan.gif)
 
 上面是演示站的真实功能轮播：星际航行者与原始双主题、一键换装、星球 favicon、多账号与文件夹级权限、WebDAV、短链总开关、站内 Markdown 查看、音频底部播放器、视频居中大窗、图片灯箱。
 
 功能演示视频（真实截图剪辑，94 秒）：[pan-demo.mp4](screenshots/pan-demo.mp4)
 
-![手机端星际主题](screenshots/front-mobile.png)
+![手机端星际主题](screenshots/front-mobile-flarepan.png)
 
-![手机端原始主题](screenshots/front-mobile-original.png)
+![手机端原始主题](screenshots/front-mobile-original-flarepan.png)
 
 手机端同样完整：搜索、文件夹、文件列表与查看器全部可用；两套主题在手机上也一样切换。
 
-![页签星球 favicon](screenshots/favicon-tab.png)
+![页签星球 favicon](screenshots/favicon-tab-flarepan.png)
 
 换肤即换图标：星球 favicon 为透明底，浏览器页签上无白底无方底。
 
