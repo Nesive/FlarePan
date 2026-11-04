@@ -68,7 +68,7 @@
           </g>
         </svg>
         <div class="brand">
-          <a href="/" @click.prevent="cwd = ''"><b>FLAREDRIVE</b></a>
+          <a href="/" @click.prevent="cwd = ''"><b>FLAREPAN</b></a>
           <div class="sub">INTERSTELLAR · 星际航行者</div>
           <div class="tag">自托管 · 开源 · 深空航行中</div>
         </div>
