@@ -1,0 +1,8 @@
+node_modules/
+dist/
+public/
+.wrangler/
+*.local
+.dev.vars
+*.bak
+AUDIT.md
