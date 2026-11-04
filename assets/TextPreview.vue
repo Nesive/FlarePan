@@ -240,9 +240,11 @@ export default {
   width: min(860px, 94vw);
   height: min(78vh, 720px);
   z-index: 96;
-  background: rgba(255, 255, 255, 0.97);
-  border-radius: 12px;
-  box-shadow: 0 12px 40px rgba(0, 0, 0, 0.25);
+  background: linear-gradient(180deg, rgba(28, 20, 66, 0.98), rgba(12, 9, 36, 0.98));
+  border: 1px solid rgba(255, 255, 255, 0.16);
+  border-radius: 16px;
+  box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.14), 0 18px 40px rgba(0, 0, 0, 0.6);
+  color: #e6edf3;
   display: flex;
   flex-direction: column;
   overflow: hidden;
@@ -252,7 +254,7 @@ export default {
   align-items: center;
   gap: 8px;
   padding: 10px 12px;
-  border-bottom: 1px solid #e5e5e5;
+  border-bottom: 1px solid rgba(255, 255, 255, 0.12);
   flex-shrink: 0;
 }
 .text-name {
@@ -263,12 +265,12 @@ export default {
   font-weight: 600;
 }
 .text-btn {
-  border: 1px solid #d0d0d0;
-  background: #fff;
-  border-radius: 8px;
+  border: 1px solid rgba(0, 229, 255, 0.45);
+  background: rgba(255, 255, 255, 0.07);
+  border-radius: 12px;
   padding: 6px 12px;
   cursor: pointer;
-  color: #39909b;
+  color: #e6edf3;
   text-decoration: none;
   font-size: 14px;
   white-space: nowrap;
@@ -276,7 +278,7 @@ export default {
 .text-state {
   padding: 24px;
   text-align: center;
-  color: #666;
+  color: #8b949e;
 }
 .text-body {
   margin: 0;
@@ -298,13 +300,13 @@ export default {
   margin: 16px 0 8px;
 }
 .text-md pre {
-  background: #f4f4f4;
+  background: rgba(255, 255, 255, 0.07);
   padding: 12px;
   border-radius: 8px;
   overflow: auto;
 }
 .text-md code {
-  background: #f4f4f4;
+  background: rgba(255, 255, 255, 0.07);
   padding: 1px 5px;
   border-radius: 4px;
 }
@@ -319,19 +321,19 @@ export default {
   border-collapse: collapse;
 }
 .text-md th, .text-md td {
-  border: 1px solid #ddd;
+  border: 1px solid rgba(255, 255, 255, 0.16);
   padding: 6px 10px;
 }
 .text-md blockquote {
-  border-left: 3px solid #39909b;
+  border-left: 3px solid #00e5ff;
   margin: 12px 0;
   padding: 4px 12px;
-  color: #555;
+  color: #c9d1d9;
 }
 .text-truncated {
   padding: 8px 16px;
-  border-top: 1px solid #eee;
-  color: #888;
+  border-top: 1px solid rgba(255, 255, 255, 0.12);
+  color: #8b949e;
   font-size: 13px;
   flex-shrink: 0;
 }

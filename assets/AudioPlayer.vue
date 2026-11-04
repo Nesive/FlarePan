@@ -20,6 +20,7 @@
         <span class="ap-name">{{ current ? current.name : '' }}</span>
         <span class="ap-count" v-if="queue.length > 1">{{ currentIndex + 1 }} / {{ queue.length }}</span>
       </div>
+      <div v-if="skin === 'starship'" class="ap-vu" :class="{ on: playing }" aria-hidden="true"><i></i><i></i><i></i><i></i></div>
       <span class="ap-time">{{ formatTime(currentTime) }} / {{ formatTime(duration) }}</span>
       <input
         class="ap-progress"
@@ -32,7 +33,7 @@
         aria-label="进度"
       />
       <span class="ap-volume">
-        <span>🔊</span>
+        <span v-if="skin !== 'starship'">🔊</span><svg v-else width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="#c9d1d9" stroke-width="1.8"><path d="M11 5L6 9H3v6h3l5 4V5z" fill="#c9d1d9" stroke="none"/><path d="M15.5 8.5a5 5 0 0 1 0 7M18.5 5.5a9 9 0 0 1 0 13"/></svg>
         <input
           class="ap-volume-range"
           type="range"
@@ -69,6 +70,10 @@ export default {
     startIndex: {
       type: Number,
       default: 0,
+    },
+    skin: {
+      type: String,
+      default: 'original',
     },
   },
 

@@ -1,0 +1,1201 @@
+/* Starship skin overlay (skin-starship.css).
+   Loaded on every page but gated by html[data-skin="starship"], so the
+   original theme is the default and this file changes nothing until the
+   skin switches. The html[data-skin] prefix also wins over base rules
+   and sfc-loader scoped rules regardless of style injection order.
+   Contents: every rule the v3 reskin changed or added, taken from the
+   diff against the recovered original theme. Functional additions
+   (upload queue, viewer wiring) are NOT here; they live in the base. */
+
+html[data-skin="starship"] body {
+  font-family: "寒蝉半圆体", -apple-system, BlinkMacSystemFont, "Segoe UI Adjusted",
+    "Segoe UI", "Liberation Sans", sans-serif !important;
+  font-weight: 400;
+  margin: 0;
+  color: #e6edf3;
+  background:
+    radial-gradient(1px 1px at 8% 12%, #fff 50%, transparent 51%),
+    radial-gradient(1px 1px at 22% 68%, #cfeaff 50%, transparent 51%),
+    radial-gradient(1.5px 1.5px at 55% 22%, #fff 50%, transparent 51%),
+    radial-gradient(1px 1px at 70% 55%, #fff 50%, transparent 51%),
+    radial-gradient(1px 1px at 88% 30%, #cfeaff 50%, transparent 51%),
+    radial-gradient(1px 1px at 40% 88%, #fff 50%, transparent 51%),
+    radial-gradient(ellipse 55% 32% at 15% 8%, rgba(124, 58, 237, 0.42), transparent 65%),
+    radial-gradient(ellipse 50% 30% at 85% 30%, rgba(0, 229, 255, 0.30), transparent 65%),
+    radial-gradient(ellipse 45% 28% at 50% 2%, rgba(236, 72, 153, 0.20), transparent 65%),
+    linear-gradient(180deg, #020108 0%, #0b0630 45%, #1a0b3d 75%, #2a1045 100%);
+  background-attachment: fixed;
+}
+html[data-skin="starship"] .file-list > li {
+  max-width: 100%;
+  margin: 0 0 12px;
+  border-radius: 14px;
+  background: linear-gradient(180deg, rgba(255, 255, 255, 0.08), rgba(255, 255, 255, 0.02));
+  border: 1px solid rgba(255, 255, 255, 0.13);
+  box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.13), 0 10px 28px rgba(0, 0, 0, 0.35);
+  transition: border-color 0.15s ease-in-out, box-shadow 0.15s ease-in-out;
+}
+html[data-skin="starship"] .file-list > li:hover {
+  border-color: rgba(0, 229, 255, 0.55);
+  box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.18), 0 0 0 1px rgba(0, 229, 255, 0.18), 0 0 28px rgba(0, 229, 255, 0.18), 0 12px 30px rgba(0, 0, 0, 0.4);
+}
+html[data-skin="starship"] input[type="search"] {
+  background: rgba(2, 1, 8, 0.55);
+  border: 1px solid rgba(255, 255, 255, 0.14);
+  border-radius: 12px;
+  width: 100%;
+  padding: 8px 12px;
+  color: #e6edf3;
+  outline: none;
+}
+html[data-skin="starship"] input[type="search"]::placeholder {
+  color: #8b949e;
+}
+html[data-skin="starship"] input[type="search"]:focus {
+  border-color: rgba(0, 229, 255, 0.6);
+  box-shadow: 0 0 0 1px rgba(0, 229, 255, 0.35), 0 0 20px rgba(0, 229, 255, 0.18);
+}
+html[data-skin="starship"] .file-item {
+  width: 100%;
+  min-height: 64px;
+  padding: 12px 14px;
+  transition: background-color 0.2s ease-in-out;
+  display: flex;
+  align-items: center;
+  cursor: pointer;
+  user-select: none;
+}
+html[data-skin="starship"] .file-icon {
+  width: 46px;
+  height: 46px;
+  flex-shrink: 0;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 0;
+  margin-right: 12px;
+  border-radius: 12px;
+  color: #fff;
+  background: linear-gradient(135deg, #38bdf8, #6366f1);
+  box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.35), 0 6px 16px rgba(0, 0, 0, 0.4);
+}
+html[data-skin="starship"] .file-icon svg {
+  fill: #fff;
+}
+html[data-skin="starship"] .file-icon img {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+  border-radius: 12px;
+}
+html[data-skin="starship"] .file-icon.tile-folder {
+  background: linear-gradient(135deg, #38bdf8, #6366f1);
+}
+html[data-skin="starship"] .file-icon.tile-video {
+  background: linear-gradient(135deg, #00e5ff, #7c3aed);
+}
+html[data-skin="starship"] .file-icon.tile-audio {
+  background: linear-gradient(135deg, #22d3ee, #a78bfa);
+}
+html[data-skin="starship"] .file-icon.tile-image {
+  background: linear-gradient(135deg, #f472b6, #7c3aed);
+}
+html[data-skin="starship"] .file-icon.tile-doc {
+  background: linear-gradient(135deg, #38bdf8, #0ea5e9);
+}
+html[data-skin="starship"] .file-icon.tile-pdf {
+  background: linear-gradient(135deg, #a78bfa, #6d28d9);
+}
+html[data-skin="starship"] .file-icon.tile-zip {
+  background: linear-gradient(135deg, #fbbf24, #ec4899);
+}
+html[data-skin="starship"] .file-icon.tile-other {
+  background: linear-gradient(135deg, #64748b, #334155);
+}
+html[data-skin="starship"] .file-icon.tile-up {
+  background: linear-gradient(135deg, #1f2937, #0f172a);
+  border: 1px dashed rgba(0, 229, 255, 0.5);
+  color: #00e5ff;
+}
+html[data-skin="starship"] .file-icon.tile-up svg {
+  fill: #00e5ff;
+}
+html[data-skin="starship"] .file-info-container {
+  flex: 1;
+  min-width: 0;
+  overflow: hidden;
+}
+html[data-skin="starship"] .file-attr {
+  white-space: nowrap;
+  text-overflow: ellipsis;
+  overflow: hidden;
+  margin-top: 4px;
+  color: #8b949e;
+  font-size: 0.8em;
+  font-family: ui-monospace, "SF Mono", Menlo, Consolas, monospace;
+}
+html[data-skin="starship"] button.circle {
+  z-index: 1;
+  border-radius: 12px;
+  padding: 0 16px;
+}
+html[data-skin="starship"] .contextmenu-list > li > * {
+  border-radius: 10px;
+  display: flex;
+  width: 100%;
+  padding: 12px;
+  text-align: left;
+  background: rgba(255, 255, 255, 0.07);
+  border: 1px solid rgba(255, 255, 255, 0.13);
+  color: #e6edf3;
+  transition: background-color 0.2s ease-in-out;
+  font-size: inherit;
+  justify-content: center;
+}
+html[data-skin="starship"] .contextmenu-list > li > *:hover {
+  background: rgba(0, 229, 255, 0.12);
+  color: #00e5ff;
+}
+html[data-skin="starship"] button {
+  background: none;
+  border: none;
+  cursor: pointer;
+  padding: 0;
+  color: inherit;
+}
+html[data-skin="starship"] .main {
+  display: flex;
+  height: 100%;
+  background: transparent;
+  overflow-y: auto;
+  flex-direction: column;
+  color: #e6edf3;
+}
+html[data-skin="starship"] .hero {
+  position: relative;
+  height: 168px;
+  overflow: hidden;
+}
+html[data-skin="starship"] .hero-svg {
+  position: absolute;
+  inset: 0;
+  width: 100%;
+  height: 100%;
+}
+html[data-skin="starship"] .brand {
+  position: relative;
+  z-index: 2;
+  max-width: 1060px;
+  margin: 0 auto;
+  padding: 34px 20px 0;
+}
+html[data-skin="starship"] .brand b {
+  display: block;
+  font-size: 44px;
+  letter-spacing: 0.12em;
+  line-height: 1;
+  background: linear-gradient(90deg, #00e5ff, #a78bfa);
+  -webkit-background-clip: text;
+  background-clip: text;
+  color: transparent;
+  filter: drop-shadow(0 2px 14px rgba(0, 229, 255, 0.35));
+}
+html[data-skin="starship"] .brand .sub {
+  margin-top: 10px;
+  font-size: 15px;
+  letter-spacing: 0.34em;
+  color: #c9d1d9;
+}
+html[data-skin="starship"] .brand .tag {
+  margin-top: 8px;
+  font-size: 13px;
+  letter-spacing: 0.24em;
+  color: #8b949e;
+}
+html[data-skin="starship"] .ctrl {
+  position: sticky;
+  top: 12px;
+  z-index: 20;
+  max-width: 1060px;
+  width: calc(100% - 40px);
+  margin: -30px auto 0;
+  padding: 14px;
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  background: linear-gradient(180deg, rgba(22, 16, 56, 0.88), rgba(10, 8, 32, 0.92));
+  border: 1px solid rgba(255, 255, 255, 0.13);
+  border-radius: 16px;
+  box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.16), 0 18px 44px rgba(0, 0, 0, 0.55);
+  backdrop-filter: blur(12px);
+}
+html[data-skin="starship"] .logo-chip {
+  flex-shrink: 0;
+  width: 40px;
+  height: 40px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  border-radius: 12px;
+  background: linear-gradient(135deg, #00e5ff, #7c3aed);
+  box-shadow: 0 0 18px rgba(0, 229, 255, 0.45);
+  font-size: 19px;
+  color: #fff;
+}
+html[data-skin="starship"] .ctrl-search {
+  flex: 1;
+  min-width: 0;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  height: 44px;
+  padding: 0 14px;
+  background: rgba(2, 1, 8, 0.55);
+  border: 1px solid rgba(255, 255, 255, 0.14);
+  border-radius: 12px;
+}
+html[data-skin="starship"] .ctrl-search:focus-within {
+  border-color: rgba(0, 229, 255, 0.6);
+  box-shadow: 0 0 0 1px rgba(0, 229, 255, 0.35), 0 0 20px rgba(0, 229, 255, 0.18);
+}
+html[data-skin="starship"] .ctrl-search input[type="search"] {
+  border: none;
+  background: none;
+  padding: 0;
+
+  font-size: 16px;
+}
+html[data-skin="starship"] .chart {
+  max-width: 1060px;
+  width: calc(100% - 40px);
+  margin: 20px auto 0;
+  display: flex;
+  align-items: center;
+  gap: 16px;
+  flex-wrap: wrap;
+}
+html[data-skin="starship"] .crumbs {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  font-size: 14px;
+  flex-wrap: wrap;
+}
+html[data-skin="starship"] .crumbs a {
+  color: #e6edf3;
+}
+html[data-skin="starship"] .crumbs a.home {
+  color: #00e5ff;
+}
+html[data-skin="starship"] .crumbs .chev {
+  color: #a78bfa;
+  font-size: 11px;
+}
+html[data-skin="starship"] .crumbs .cur {
+  background: linear-gradient(90deg, #00e5ff, #a78bfa);
+  -webkit-background-clip: text;
+  background-clip: text;
+  color: transparent;
+  font-weight: 700;
+}
+html[data-skin="starship"] .ship {
+  margin-left: auto;
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 10px 14px;
+  background: linear-gradient(180deg, rgba(255, 255, 255, 0.08), rgba(255, 255, 255, 0.02));
+  border: 1px solid rgba(255, 255, 255, 0.13);
+  border-radius: 12px;
+  box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.12);
+}
+html[data-skin="starship"] .ship .dot {
+  width: 8px;
+  height: 8px;
+  border-radius: 50%;
+  background: #3fb950;
+  box-shadow: 0 0 10px #3fb950;
+}
+html[data-skin="starship"] .ship .lbl {
+  font-size: 12px;
+  color: #8b949e;
+}
+html[data-skin="starship"] .ship .num {
+  font-family: ui-monospace, "SF Mono", Menlo, Consolas, monospace;
+  font-size: 13px;
+}
+html[data-skin="starship"] .orbit {
+  display: flex;
+  align-items: center;
+  gap: 14px;
+  max-width: 1060px;
+  width: calc(100% - 40px);
+  margin: 8px auto 0;
+}
+html[data-skin="starship"] .orbit .line {
+  flex: 1;
+  height: 2px;
+}
+html[data-skin="starship"] .orbit .line.l {
+  background: linear-gradient(90deg, transparent, #00e5ff);
+}
+html[data-skin="starship"] .orbit .line.r {
+  background: linear-gradient(90deg, #a78bfa, transparent);
+}
+html[data-skin="starship"] .orbit .planet {
+  flex-shrink: 0;
+  animation: twinkle 2.6s ease-in-out infinite;
+}
+html[data-skin="starship"] .iconbtn {
+  width: 38px;
+  height: 38px;
+  flex-shrink: 0;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  border-radius: 11px;
+  background: rgba(255, 255, 255, 0.06);
+  border: 1px solid rgba(255, 255, 255, 0.13);
+  color: #c9d1d9;
+}
+html[data-skin="starship"] .iconbtn:hover {
+  color: #00e5ff;
+  border-color: rgba(0, 229, 255, 0.5);
+}
+html[data-skin="starship"] .voyager-state {
+  color: #8b949e;
+}
+html[data-skin="starship"] .voyager-retry {
+  background: linear-gradient(180deg, rgba(0, 229, 255, 0.22), rgba(124, 58, 237, 0.22));
+  border: 1px solid rgba(0, 229, 255, 0.45);
+  border-radius: 12px;
+  color: #e6edf3;
+}
+html[data-skin="starship"] .app-bar {
+  position: relative;
+  z-index: 1;
+  padding: 0;
+  background: transparent;
+  display: block;
+}
+html[data-skin="starship"] .menu-button {
+  display: flex;
+  position: relative;
+  flex-shrink: 0;
+}
+html[data-skin="starship"] .file-list-container {
+  margin: 16px auto 0;
+  padding: 10px 0;
+  width: min(1060px, calc(100% - 40px));
+  background: transparent;
+}
+html[data-skin="starship"] .menu-button>button.circle {
+  display: flex;
+  align-items: center;
+  height: 44px;
+  padding: 0 18px;
+  font-size: 15px;
+  color: #e6edf3;
+  background: linear-gradient(180deg, rgba(0, 229, 255, 0.20), rgba(124, 58, 237, 0.20));
+  border: 1px solid rgba(0, 229, 255, 0.45);
+  border-radius: 12px;
+  transition: box-shadow 0.2s ease;
+}
+html[data-skin="starship"] .menu-button>button.circle:hover {
+  box-shadow: 0 0 18px rgba(0, 229, 255, 0.35);
+}
+html[data-skin="starship"] .share-gate {
+  margin: 40px auto;
+  padding: 28px 24px;
+  width: 360px;
+  max-width: calc(100% - 32px);
+  text-align: center;
+  background: linear-gradient(180deg, rgba(255, 255, 255, 0.08), rgba(255, 255, 255, 0.02));
+  border: 1px solid rgba(255, 255, 255, 0.13);
+  backdrop-filter: blur(10px);
+  border-radius: 16px;
+  box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.13), 0 14px 34px rgba(0, 0, 0, 0.4);
+}
+html[data-skin="starship"] .share-gate-sub {
+  font-size: 14px;
+  color: #8b949e;
+  margin-bottom: 20px;
+}
+html[data-skin="starship"] .share-code-input {
+  width: 220px;
+  max-width: 100%;
+  padding: 12px 16px;
+  font-size: 20px;
+  letter-spacing: 0.3em;
+  text-indent: 0.3em;
+  text-align: center;
+  border: 1.5px solid rgba(0, 229, 255, 0.45);
+  border-radius: 12px;
+  background: rgba(2, 1, 8, 0.55);
+  color: #e6edf3;
+  outline: none;
+}
+html[data-skin="starship"] .share-code-input:focus {
+  border-color: #00e5ff;
+  box-shadow: 0 0 0 3px rgba(0, 229, 255, 0.2);
+}
+html[data-skin="starship"] .share-enter-btn {
+  margin-top: 16px;
+  padding: 10px 48px;
+  font-size: 16px;
+  font-weight: 700;
+  color: #0b0630;
+  background: linear-gradient(135deg, #00e5ff, #a78bfa);
+  border-radius: 12px;
+  box-shadow: 0 0 20px rgba(0, 229, 255, 0.45);
+}
+html[data-skin="starship"] .share-gate-error {
+  margin-top: 14px;
+  color: #f778ba;
+  font-size: 14px;
+}
+html[data-skin="starship"] .share-gate-wait {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 10px;
+  padding: 18px 0 6px;
+  font-size: 15px;
+  color: #8b949e;
+}
+html[data-skin="starship"] .share-spinner {
+  width: 18px;
+  height: 18px;
+  border-radius: 50%;
+  border: 2px solid rgba(0, 229, 255, 0.25);
+  border-top-color: #00e5ff;
+  animation: share-spin 0.8s linear infinite;
+}
+html[data-skin="starship"] .audio-prompt-name {
+  font-size: 14px;
+  color: #8b949e;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  margin-bottom: 12px;
+}
+html[data-skin="starship"] .audio-prompt-btns button {
+  padding: 9px 18px;
+  font-size: 14px;
+  border-radius: 12px;
+  border: 1.5px solid rgba(0, 229, 255, 0.45);
+  background: rgba(255, 255, 255, 0.07);
+  color: #e6edf3;
+  cursor: pointer;
+}
+html[data-skin="starship"] .audio-prompt-btns button.audio-prompt-primary {
+  background: linear-gradient(135deg, #00e5ff, #a78bfa);
+  color: #0b0630;
+  border-color: transparent;
+}
+html[data-skin="starship"] .admin-page {
+  min-height: 100%;
+  padding: 24px 16px 60px;
+  font-family: "寒蝉半圆体", -apple-system, BlinkMacSystemFont, "Segoe UI Adjusted",
+    "Segoe UI", "Liberation Sans", sans-serif;
+  background: transparent;
+  color: #e6edf3;
+}
+html[data-skin="starship"] .admin-page button {
+  font-size: 15px;
+  padding: 8px 14px;
+  border: 1px solid rgba(255, 255, 255, 0.13);
+  border-radius: 12px;
+  background: rgba(255, 255, 255, 0.07);
+  color: #e6edf3;
+  transition: background-color 0.2s ease-in-out;
+}
+html[data-skin="starship"] .admin-page button:hover:not(:disabled) {
+  background: rgba(0, 229, 255, 0.12);
+  border-color: rgba(0, 229, 255, 0.45);
+}
+html[data-skin="starship"] .admin-page input[type="text"], html[data-skin="starship"] .admin-page input[type="password"], html[data-skin="starship"] .admin-page input[type="number"], html[data-skin="starship"] .admin-page input:not([type]) {
+  background-color: rgba(2, 1, 8, 0.55);
+  border: 1px solid rgba(255, 255, 255, 0.14);
+  border-radius: 16px;
+  padding: 10px 14px;
+  box-sizing: border-box;
+  font-size: 15px;
+  color: #e6edf3;
+}
+html[data-skin="starship"] .admin-limit-card {
+  background: linear-gradient(180deg, rgba(255, 255, 255, 0.08), rgba(255, 255, 255, 0.02));
+  border: 1px solid rgba(255, 255, 255, 0.13);
+  border-radius: 12px;
+  box-shadow: 0 1px 3px rgba(0, 0, 0, 0.06);
+}
+html[data-skin="starship"] .admin-limit-unit,
+html[data-skin="starship"] .admin-limit-hint {
+  color: #8b949e;
+}
+html[data-skin="starship"] .admin-page select {
+  background-color: rgba(2, 1, 8, 0.55);
+  border: 1px solid rgba(255, 255, 255, 0.14);
+  border-radius: 16px;
+  padding: 10px 12px;
+  font-size: 15px;
+  color: #e6edf3;
+}
+html[data-skin="starship"] .admin-page code {
+  background-color: rgba(255, 255, 255, 0.07);
+  padding: 2px 8px;
+  border-radius: 8px;
+}
+html[data-skin="starship"] .admin-login {
+  max-width: 420px;
+  margin: 80px auto 0;
+  background: linear-gradient(180deg, rgba(255, 255, 255, 0.08), rgba(255, 255, 255, 0.02));
+  border: 1px solid rgba(255, 255, 255, 0.13);
+  backdrop-filter: blur(10px);
+  border-radius: 16px;
+  box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.13), 0 14px 34px rgba(0, 0, 0, 0.4);
+  padding: 28px 24px;
+}
+html[data-skin="starship"] .admin-sub {
+  color: #8b949e;
+  font-size: 14px;
+  line-height: 1.6;
+}
+html[data-skin="starship"] .admin-page .admin-btn-primary {
+  padding: 10px 24px;
+  background: linear-gradient(135deg, #00e5ff, #a78bfa);
+  color: #0b0630;
+  border: 0;
+  border-radius: 12px;
+  cursor: pointer;
+  box-shadow: 0 0 20px rgba(0, 229, 255, 0.45);
+  font-size: 15px;
+  font-weight: 700;
+}
+html[data-skin="starship"] .admin-page .admin-btn-primary:hover:not(:disabled) {
+  filter: brightness(1.1);
+  background: linear-gradient(135deg, #00e5ff, #a78bfa);
+}
+html[data-skin="starship"] .admin-page .admin-btn {
+  padding: 8px 16px;
+  cursor: pointer;
+  background: rgba(255, 255, 255, 0.07);
+  border-radius: 12px;
+}
+html[data-skin="starship"] .admin-console {
+  max-width: 900px;
+  margin: 0 auto;
+  background: linear-gradient(180deg, rgba(255, 255, 255, 0.08), rgba(255, 255, 255, 0.02));
+  border: 1px solid rgba(255, 255, 255, 0.13);
+  backdrop-filter: blur(10px);
+  border-radius: 16px;
+  box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.13), 0 14px 34px rgba(0, 0, 0, 0.4);
+  padding: 24px;
+}
+html[data-skin="starship"] .admin-who {
+  margin-left: auto;
+  background: rgba(255, 255, 255, 0.07);
+  border-radius: 50px;
+  padding: 6px 14px;
+  font-size: 13px;
+  color: #8b949e;
+}
+html[data-skin="starship"] .admin-tabs {
+  display: flex;
+  gap: 8px;
+  margin: 16px 0 24px;
+  flex-wrap: wrap;
+  background: rgba(255, 255, 255, 0.06);
+  border: 1px solid rgba(255, 255, 255, 0.13);
+  backdrop-filter: blur(10px);
+  border-radius: 50px;
+  padding: 6px;
+  box-shadow: 0 4px 8px rgba(0, 0, 0, 0.1);
+  width: fit-content;
+  max-width: 100%;
+}
+html[data-skin="starship"] .admin-page .admin-tabs button:hover:not(.on) {
+  background: rgba(0, 229, 255, 0.10);
+}
+html[data-skin="starship"] .admin-page .admin-tabs button.on {
+  background: linear-gradient(135deg, #00e5ff, #a78bfa);
+  color: #0b0630;
+  font-weight: bold;
+  box-shadow: 0 0 16px rgba(0, 229, 255, 0.4);
+}
+html[data-skin="starship"] .admin-console section > p, html[data-skin="starship"] .admin-desc {
+  color: #8b949e;
+  font-size: 14px;
+  line-height: 1.6;
+}
+html[data-skin="starship"] .admin-error {
+  color: #f778ba;
+  background: rgba(247, 120, 186, 0.10);
+  border-radius: 10px;
+  padding: 10px 14px;
+  margin: 12px 0;
+}
+html[data-skin="starship"] .admin-ok {
+  color: #3fb950;
+  background: rgba(63, 185, 80, 0.10);
+  border-radius: 10px;
+  padding: 10px 14px;
+  margin: 12px 0;
+}
+html[data-skin="starship"] .admin-warn {
+  color: #fbbf24;
+  background: rgba(255, 193, 7, 0.15);
+  border-radius: 10px;
+  padding: 10px 14px;
+  margin: 12px 0;
+}
+html[data-skin="starship"] .admin-busy {
+  color: #8b949e;
+  font-size: 14px;
+}
+html[data-skin="starship"] .switch-track {
+  display: inline-block;
+  width: 48px;
+  height: 28px;
+  border-radius: 14px;
+  background: rgba(255, 255, 255, 0.15);
+  position: relative;
+  transition: background 0.2s;
+  vertical-align: middle;
+}
+html[data-skin="starship"] .switch input:checked + .switch-track {
+  background: linear-gradient(135deg, #00e5ff, #a78bfa);
+}
+html[data-skin="starship"] .switch-hint {
+  color: #8b949e;
+  font-size: 14px;
+}
+html[data-skin="starship"] .admin-list li {
+  display: flex;
+  gap: 10px;
+  align-items: center;
+  background: linear-gradient(180deg, rgba(255, 255, 255, 0.08), rgba(255, 255, 255, 0.02));
+  border: 1px solid rgba(255, 255, 255, 0.13);
+  border-radius: 10px;
+  padding: 12px 14px;
+  flex-wrap: wrap;
+  box-shadow: 0 1px 3px rgba(0, 0, 0, 0.06);
+  transition: background-color 0.2s ease-in-out;
+}
+html[data-skin="starship"] .admin-list li:hover {
+  background: rgba(0, 229, 255, 0.08);
+}
+html[data-skin="starship"] .admin-list li a {
+  color: #00e5ff;
+}
+html[data-skin="starship"] .admin-file-meta {
+  color: #8b949e;
+  font-size: 13px;
+  line-height: 1.5;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+html[data-skin="starship"] .admin-check-row input[type="checkbox"] {
+  width: 18px;
+  height: 18px;
+  flex-shrink: 0;
+  accent-color: #00e5ff;
+}
+html[data-skin="starship"] .admin-prot-tag {
+  background: rgba(0, 229, 255, 0.12);
+  color: #00e5ff;
+  border-radius: 50px;
+  padding: 2px 10px;
+  font-size: 12px;
+  white-space: nowrap;
+}
+html[data-skin="starship"] .admin-page .admin-tree-exp {
+  flex-shrink: 0;
+  width: 24px;
+  height: 24px;
+  padding: 0;
+  border: none;
+  border-radius: 6px;
+  background: transparent;
+  cursor: pointer;
+  font-size: 14px;
+  line-height: 1;
+  color: #8b949e;
+}
+html[data-skin="starship"] .admin-tree-covered {
+  color: #8b949e;
+  font-size: 12px;
+  white-space: nowrap;
+  flex-shrink: 0;
+}
+html[data-skin="starship"] .admin-tree-status, html[data-skin="starship"] .admin-tree-empty {
+  color: #8b949e;
+  font-size: 13px;
+  padding-top: 2px;
+  padding-bottom: 2px;
+}
+html[data-skin="starship"] .admin-box {
+  background: linear-gradient(180deg, rgba(255, 255, 255, 0.08), rgba(255, 255, 255, 0.02));
+  border: 1px solid rgba(255, 255, 255, 0.13);
+  border-radius: 10px;
+  padding: 16px;
+  margin: 16px 0;
+  box-shadow: 0 1px 3px rgba(0, 0, 0, 0.06);
+}
+html[data-skin="starship"] .admin-box pre {
+  background: rgba(255, 255, 255, 0.07);
+  padding: 12px;
+  overflow-x: auto;
+  border-radius: 8px;
+}
+html[data-skin="starship"] .admin-progress {
+  height: 8px;
+  border-radius: 4px;
+  background: rgba(255, 255, 255, 0.10);
+  overflow: hidden;
+  margin: 8px 0;
+}
+html[data-skin="starship"] .admin-progress-fill {
+  height: 100%;
+  background: linear-gradient(90deg, #00e5ff, #a78bfa);
+  transition: width 0.2s ease;
+}
+html[data-skin="starship"] .admin-danger {
+  color: #f778ba;
+}
+html[data-skin="starship"] .admin-empty {
+  color: #8b949e;
+  margin: 16px 0;
+  padding: 28px 16px;
+  text-align: center;
+  border: 2px dashed rgba(255, 255, 255, 0.2);
+  border-radius: 10px;
+  background: rgba(255, 255, 255, 0.06);
+}
+html[data-skin="starship"] .admin-rules {
+  background: rgba(255, 255, 255, 0.07);
+  padding: 12px 14px;
+  border-radius: 10px;
+}
+html[data-skin="starship"] .admin-picker {
+  background: linear-gradient(180deg, rgba(28, 20, 66, 0.98), rgba(12, 9, 36, 0.98));
+  border: 1px solid rgba(255, 255, 255, 0.16);
+  backdrop-filter: blur(10px);
+  border-radius: 16px;
+  box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.14), 0 18px 40px rgba(0, 0, 0, 0.6);
+  color: #e6edf3;
+  padding: 24px;
+  width: 100%;
+  max-width: 640px;
+  max-height: 80vh;
+  overflow-y: auto;
+  box-sizing: border-box;
+}
+html[data-skin="starship"] .admin-list li.admin-picker-selected, html[data-skin="starship"] .admin-picker-selected {
+  background: rgba(0, 229, 255, 0.12);
+}
+html[data-skin="starship"] .menu-content {
+  top: 16px;
+  position: absolute;
+  background: linear-gradient(180deg, rgba(28, 20, 66, 0.97), rgba(12, 9, 36, 0.97));
+  border: 1px solid rgba(255, 255, 255, 0.16);
+  box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.14), 0 18px 40px rgba(0, 0, 0, 0.6);
+  color: #e6edf3;
+  z-index: 2;
+  border-radius: 14px;
+  right: -100%;
+  min-width: 168px;
+}
+html[data-skin="starship"] .menu-content li:hover {
+  background-color: rgba(0, 229, 255, 0.12);
+  color: #00e5ff;
+}
+html[data-skin="starship"] .dialog-container {
+  background: linear-gradient(180deg, rgba(28, 20, 66, 0.98), rgba(12, 9, 36, 0.98));
+  border: 1px solid rgba(255, 255, 255, 0.16);
+  border-radius: 16px;
+  box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.14), 0 18px 40px rgba(0, 0, 0, 0.6);
+  color: #e6edf3;
+  overflow: hidden;
+  padding: 10px;
+}
+html[data-skin="starship"] .ap-list {
+  max-height: 40vh;
+  overflow-y: auto;
+  background: linear-gradient(180deg, rgba(28, 20, 66, 0.97), rgba(12, 9, 36, 0.97));
+  backdrop-filter: blur(10px);
+  border-top: 1px solid rgba(0, 229, 255, 0.35);
+  box-shadow: 0 -2px 12px rgba(0, 0, 0, 0.3);
+  color: #e6edf3;
+}
+html[data-skin="starship"] .ap-list-item {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 10px 16px;
+  cursor: pointer;
+  font-size: 14px;
+  border-bottom: 1px solid rgba(255, 255, 255, 0.08);
+}
+html[data-skin="starship"] .ap-list-item.active {
+  color: #00e5ff;
+  font-weight: 600;
+}
+html[data-skin="starship"] .ap-bar {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  height: 64px;
+  padding: 0 12px;
+  background: linear-gradient(180deg, #1a1440, #0a061e);
+  backdrop-filter: blur(10px);
+  border-top: 1px solid rgba(0, 229, 255, 0.35);
+  box-shadow: 0 -12px 40px rgba(0, 0, 0, 0.55), inset 0 1px 0 rgba(255, 255, 255, 0.14);
+  color: #e6edf3;
+}
+html[data-skin="starship"] .ap-btn {
+  flex: none;
+  width: 36px;
+  height: 36px;
+  padding: 0;
+  border: 1px solid rgba(255, 255, 255, 0.14);
+  border-radius: 12px;
+  background: rgba(255, 255, 255, 0.07);
+  color: #e6edf3;
+  font-size: 16px;
+  cursor: pointer;
+}
+html[data-skin="starship"] .ap-play {
+  width: 44px;
+  height: 44px;
+  font-size: 18px;
+  background: linear-gradient(135deg, #00e5ff, #a78bfa);
+  border: none;
+  color: #0b0630;
+  box-shadow: 0 0 20px rgba(0, 229, 255, 0.55);
+}
+html[data-skin="starship"] .ap-vu {
+  flex: none;
+  display: flex;
+  align-items: flex-end;
+  gap: 2px;
+  height: 18px;
+}
+html[data-skin="starship"] .ap-vu i {
+  width: 3px;
+  border-radius: 2px;
+  background: linear-gradient(180deg, #00e5ff, #a78bfa);
+  transform: scaleY(0.3);
+  transform-origin: bottom;
+}
+html[data-skin="starship"] .ap-vu i:nth-child(1) { height: 100%; }
+html[data-skin="starship"] .ap-vu i:nth-child(2) { height: 70%; }
+html[data-skin="starship"] .ap-vu i:nth-child(3) { height: 90%; }
+html[data-skin="starship"] .ap-vu i:nth-child(4) { height: 55%; }
+html[data-skin="starship"] .ap-vu.on i {
+  animation: ap-vu-bounce 1s ease-in-out infinite;
+}
+html[data-skin="starship"] .ap-vu.on i:nth-child(2) { animation-delay: 0.15s; }
+html[data-skin="starship"] .ap-vu.on i:nth-child(3) { animation-delay: 0.3s; }
+html[data-skin="starship"] .ap-vu.on i:nth-child(4) { animation-delay: 0.45s; }
+html[data-skin="starship"] .ap-count {
+  font-size: 12px;
+  color: #8b949e;
+}
+html[data-skin="starship"] .ap-time {
+  flex: none;
+  font-size: 12px;
+  color: #8b949e;
+  white-space: nowrap;
+}
+html[data-skin="starship"] .ap-progress {
+  flex: 1;
+  min-width: 60px;
+  -webkit-appearance: none;
+  appearance: none;
+  height: 8px;
+  border-radius: 4px;
+  background: rgba(255, 255, 255, 0.12);
+  outline: none;
+  cursor: pointer;
+}
+html[data-skin="starship"] .ap-progress::-webkit-slider-runnable-track {
+  height: 8px;
+  border-radius: 4px;
+  background: linear-gradient(90deg, #00e5ff, #a78bfa);
+}
+html[data-skin="starship"] .ap-progress::-webkit-slider-thumb {
+  -webkit-appearance: none;
+  width: 16px;
+  height: 16px;
+  margin-top: -4px;
+  border-radius: 50%;
+  background: #fff;
+  border: none;
+  box-shadow: 0 0 12px rgba(0, 229, 255, 0.8);
+  cursor: pointer;
+}
+html[data-skin="starship"] .ap-progress::-moz-range-track {
+  height: 8px;
+  border-radius: 4px;
+  background: linear-gradient(90deg, #00e5ff, #a78bfa);
+}
+html[data-skin="starship"] .ap-progress::-moz-range-thumb {
+  width: 16px;
+  height: 16px;
+  border-radius: 50%;
+  background: #fff;
+  border: none;
+  box-shadow: 0 0 12px rgba(0, 229, 255, 0.8);
+  cursor: pointer;
+}
+html[data-skin="starship"] .ap-volume-range {
+  width: 80px;
+  accent-color: #00e5ff;
+  cursor: pointer;
+}
+html[data-skin="starship"] .video-player {
+  position: fixed;
+  z-index: 95;
+  display: flex;
+  flex-direction: column;
+  background: #000;
+  border: 1px solid rgba(255, 255, 255, 0.14);
+  border-radius: 16px;
+  overflow: hidden;
+  box-shadow: 0 8px 30px rgba(0, 0, 0, 0.45);
+  font-family: '寒蝉半圆体', -apple-system, BlinkMacSystemFont, 'Segoe UI Adjusted',
+    'Segoe UI', 'Liberation Sans', sans-serif;
+}
+html[data-skin="starship"] .video-head {
+  flex: none;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 6px 10px;
+  background: rgba(20, 20, 20, 0.95);
+  border-bottom: 1px solid rgba(255, 255, 255, 0.10);
+}
+html[data-skin="starship"] .video-btn {
+  flex: none;
+  padding: 4px 12px;
+  font-size: 13px;
+  color: #e6edf3;
+  background: rgba(255, 255, 255, 0.07);
+  border: 1px solid rgba(0, 229, 255, 0.45);
+  border-radius: 12px;
+  cursor: pointer;
+}
+html[data-skin="starship"] .video-error {
+  padding: 10px 12px;
+  font-size: 13px;
+  color: #f778ba;
+  background: #1a1a1a;
+}
+html[data-skin="starship"] .video-transcoding {
+  padding: 10px 12px;
+  font-size: 13px;
+  color: #00e5ff;
+  background: #1a1a1a;
+}
+html[data-skin="starship"] .pdf-preview {
+  position: fixed;
+  top: 0;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  z-index: 90;
+  display: flex;
+  flex-direction: column;
+  background: linear-gradient(180deg, #0b0630, #020108);
+  color: #e6edf3;
+  font-family: '寒蝉半圆体', -apple-system, BlinkMacSystemFont, 'Segoe UI Adjusted',
+    'Segoe UI', 'Liberation Sans', sans-serif;
+}
+html[data-skin="starship"] .pdf-head {
+  flex: none;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 8px 12px;
+  background: rgba(12, 9, 36, 0.92);
+  backdrop-filter: blur(10px);
+  border-bottom: 1px solid rgba(0, 229, 255, 0.35);
+}
+html[data-skin="starship"] .pdf-btn {
+  flex: none;
+  padding: 6px 14px;
+  font-size: 14px;
+  color: #e6edf3;
+  background: rgba(255, 255, 255, 0.07);
+  border: 1px solid rgba(0, 229, 255, 0.45);
+  border-radius: 12px;
+  text-decoration: none;
+  cursor: pointer;
+}
+html[data-skin="starship"] .pdf-canvas-scroll {
+  flex: 1;
+  min-height: 0;
+  overflow-y: auto;
+  -webkit-overflow-scrolling: touch;
+  background: #0b0630;
+}
+html[data-skin="starship"] .pdf-canvas-state {
+  padding: 40px 20px;
+  text-align: center;
+  color: #8b949e;
+  font-size: 15px;
+}
+@media (max-width: 600px) {
+  html[data-skin="starship"] .hero {
+    height: 128px;
+  }
+  html[data-skin="starship"] .brand {
+    padding: 22px 16px 0;
+  }
+  html[data-skin="starship"] .brand b {
+    font-size: 30px;
+  }
+  html[data-skin="starship"] .brand .sub {
+    font-size: 12px;
+    letter-spacing: 0.22em;
+  }
+  html[data-skin="starship"] .brand .tag {
+    display: none;
+  }
+  html[data-skin="starship"] .ctrl {
+    width: calc(100% - 24px);
+    margin-top: -24px;
+    padding: 12px;
+    flex-wrap: wrap;
+  }
+  html[data-skin="starship"] .logo-chip {
+    display: none;
+  }
+  html[data-skin="starship"] .ctrl-search {
+    order: 2;
+    flex-basis: 100%;
+  }
+  html[data-skin="starship"] .menu-button {
+    order: 1;
+    margin-left: auto;
+  }
+  html[data-skin="starship"] .chart, html[data-skin="starship"] .orbit {
+    width: calc(100% - 32px);
+  }
+  html[data-skin="starship"] .ship {
+    display: none;
+  }
+}
+@keyframes twinkle {
+  0%, 100% { opacity: 1; }
+  50% { opacity: 0.2; }
+}
+@keyframes ap-vu-bounce {
+  0%, 100% { transform: scaleY(0.3); }
+  50% { transform: scaleY(1); }
+}
+
+/* Admin upload queue, starship palette (base carries the light variant). */
+html[data-skin="starship"] .admin-upload-row {
+  border: 1px solid rgba(255, 255, 255, 0.13);
+  border-radius: 10px;
+  padding: 10px 12px;
+  margin: 10px 0;
+}
+html[data-skin="starship"] .admin-upload-row-top {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+html[data-skin="starship"] .admin-upload-name {
+  flex: 1;
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+html[data-skin="starship"] .admin-upload-pill {
+  flex: none;
+  font-size: 13px;
+  padding: 2px 10px;
+  border-radius: 50px;
+  background: rgba(255, 255, 255, 0.07);
+}
+html[data-skin="starship"] .admin-upload-pill-uploading {
+  background: rgba(0, 229, 255, 0.16);
+}
+html[data-skin="starship"] .admin-upload-pill-done {
+  color: #3fb950;
+  background: rgba(63, 185, 80, 0.12);
+}
+html[data-skin="starship"] .admin-upload-pill-failed {
+  color: #f778ba;
+  background: rgba(247, 120, 186, 0.10);
+}
+html[data-skin="starship"] .admin-upload-pill-cleaned {
+  background: rgba(167, 139, 250, 0.16);
+}
+html[data-skin="starship"] .admin-upload-row-bottom {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 8px;
+  font-size: 13px;
+}
+html[data-skin="starship"] .admin-upload-meta {
+  color: #8b949e;
+}
+html[data-skin="starship"] .admin-upload-note {
+  color: #e6edf3;
+}
+html[data-skin="starship"] .admin-upload-error {
+  color: #f778ba;
+}
+html[data-skin="starship"] .admin-upload-actions {
+  margin-left: auto;
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+}
+html[data-skin="starship"] .admin-upload-actions button {
+  font-size: 13px;
+  padding: 4px 10px;
+}
+html[data-skin="starship"] .admin-upload-batchbar {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  align-items: center;
+  margin-top: 12px;
+}
+html[data-skin="starship"] .admin-upload-totalbar {
+  flex: 1 1 100%;
+}
+html[data-skin="starship"] .admin-upload-total {
+  font-size: 13px;
+  color: #8b949e;
+}
+
+/* Original 400px rule hides .menu-button-text with !important; under
+   starship the nav button label must stay visible. */
+@media (max-width: 400px) {
+  html[data-skin="starship"] .menu-button-text { display: inline !important; }
+}
+/* InfoPreview note: light gray is unreadable on the original white
+   dialog, so the base uses #555 and starship restores the light gray. */
+html[data-skin="starship"] .info-note { color: #c9d1d9; }
+/* Admin skin cards, starship palette. */
+html[data-skin="starship"] .admin-skin-card {
+  background: linear-gradient(180deg, rgba(255, 255, 255, 0.08), rgba(255, 255, 255, 0.02));
+  border: 1px solid rgba(255, 255, 255, 0.13);
+  color: #e6edf3;
+}
+html[data-skin="starship"] .admin-skin-card.on {
+  border-color: rgba(0, 229, 255, 0.45);
+}
+html[data-skin="starship"] .admin-skin-current {
+  background: rgba(0, 229, 255, 0.12);
+  color: #00e5ff;
+}

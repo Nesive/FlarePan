@@ -1,11 +1,100 @@
 <template>
   <AdminView v-if="isAdminPage" />
-  <div v-else class="main" 
-      @dragenter.prevent 
-      @dragover.prevent 
-      :style="{ backgroundImage: `url('${backgroundImageUrl}')`, paddingBottom: playerQueue.length ? '76px' : '' }"
+  <div v-else class="main"
+      @dragenter.prevent
+      @dragover.prevent
+      :style="{ backgroundImage: isStarship ? undefined : `url('${backgroundImageUrl}')`, paddingBottom: playerQueue.length ? '76px' : '' }"
   >
+<template v-if="isStarship">
     <div class="app-bar">
+      <div class="hero">
+        <svg class="hero-svg" viewBox="0 0 1200 300" preserveAspectRatio="xMidYMid slice" aria-hidden="true">
+          <defs>
+            <radialGradient id="heroNebP" cx="50%" cy="50%" r="50%">
+              <stop offset="0%" stop-color="#7c3aed" stop-opacity="0.55"/><stop offset="100%" stop-color="#7c3aed" stop-opacity="0"/>
+            </radialGradient>
+            <radialGradient id="heroNebC" cx="50%" cy="50%" r="50%">
+              <stop offset="0%" stop-color="#00e5ff" stop-opacity="0.40"/><stop offset="100%" stop-color="#00e5ff" stop-opacity="0"/>
+            </radialGradient>
+            <radialGradient id="heroNebM" cx="50%" cy="50%" r="50%">
+              <stop offset="0%" stop-color="#ec4899" stop-opacity="0.28"/><stop offset="100%" stop-color="#ec4899" stop-opacity="0"/>
+            </radialGradient>
+            <radialGradient id="heroPlanet" cx="38%" cy="35%" r="75%">
+              <stop offset="0%" stop-color="#a8c6ff"/><stop offset="45%" stop-color="#3b5bd6"/><stop offset="100%" stop-color="#141040"/>
+            </radialGradient>
+            <linearGradient id="heroRing" x1="0" y1="0" x2="1" y2="0">
+              <stop offset="0%" stop-color="#00e5ff" stop-opacity="0.15"/><stop offset="50%" stop-color="#00e5ff" stop-opacity="0.95"/><stop offset="100%" stop-color="#a78bfa" stop-opacity="0.25"/>
+            </linearGradient>
+            <linearGradient id="heroShoot" x1="0" y1="0" x2="1" y2="0">
+              <stop offset="0%" stop-color="#ffffff" stop-opacity="0"/><stop offset="100%" stop-color="#ffffff"/>
+            </linearGradient>
+            <filter id="heroBlur40" x="-40%" y="-40%" width="180%" height="180%"><feGaussianBlur stdDeviation="40"/></filter>
+            <clipPath id="heroPlanetClip"><circle cx="920" cy="150" r="62"/></clipPath>
+          </defs>
+          <ellipse cx="250" cy="90" rx="280" ry="130" fill="url(#heroNebP)" filter="url(#heroBlur40)"/>
+          <ellipse cx="1000" cy="230" rx="300" ry="140" fill="url(#heroNebC)" filter="url(#heroBlur40)"/>
+          <ellipse cx="600" cy="40" rx="220" ry="90" fill="url(#heroNebM)" filter="url(#heroBlur40)"/>
+          <g fill="#ffffff">
+            <circle cx="120" cy="40" r="2" style="animation: twinkle 2.9s ease-in-out 0.6s infinite"/>
+            <circle cx="300" cy="90" r="1.4" style="animation: twinkle 3.2s ease-in-out 1.4s infinite"/>
+            <circle cx="470" cy="50" r="2" style="animation: twinkle 3.7s ease-in-out 1s infinite"/>
+            <circle cx="640" cy="110" r="1.2" style="animation: twinkle 2.8s ease-in-out 2s infinite"/>
+            <circle cx="780" cy="60" r="1.7" style="animation: twinkle 4.5s ease-in-out 0.5s infinite"/>
+            <circle cx="180" cy="200" r="1.6" style="animation: twinkle 3.3s ease-in-out 2.5s infinite"/>
+            <circle cx="420" cy="230" r="2" style="animation: twinkle 2.5s ease-in-out 1.2s infinite"/>
+            <circle cx="560" cy="180" r="1.3" style="animation: twinkle 3.8s ease-in-out 0.8s infinite"/>
+            <circle cx="700" cy="250" r="1.5" style="animation: twinkle 3s ease-in-out 1.8s infinite"/>
+            <circle cx="1080" cy="70" r="1.8" style="animation: twinkle 4s ease-in-out 2.2s infinite"/>
+            <circle cx="1150" cy="200" r="1.4" style="animation: twinkle 2.6s ease-in-out 0.4s infinite"/>
+            <circle cx="60" cy="140" r="1.8" style="animation: twinkle 4.4s ease-in-out 1.6s infinite"/>
+          </g>
+          <circle cx="920" cy="150" r="118" fill="none" stroke="#ffffff" stroke-opacity="0.15" stroke-dasharray="4 9"/>
+          <ellipse cx="920" cy="150" rx="112" ry="26" fill="none" stroke="url(#heroRing)" stroke-width="10" opacity="0.55" transform="rotate(-18 920 150)"/>
+          <circle cx="920" cy="150" r="62" fill="url(#heroPlanet)"/>
+          <g clip-path="url(#heroPlanetClip)">
+            <rect x="920" y="88" width="62" height="124" fill="#000000" opacity="0.35"/>
+            <ellipse cx="900" cy="130" rx="32" ry="11" fill="#7dd3fc" opacity="0.25" transform="rotate(-18 900 130)"/>
+          </g>
+          <path d="M 1025.5 114.5 A 112 26 -18 0 0 814.5 185.5" fill="none" stroke="url(#heroRing)" stroke-width="10" opacity="0.9"/>
+          <g transform="translate(1038 150)">
+            <rect x="-13" y="-2.5" width="10" height="5" fill="#38bdf8"/>
+            <rect x="3" y="-2.5" width="10" height="5" fill="#38bdf8"/>
+            <rect x="-3.5" y="-4" width="7" height="8" rx="2" fill="#e6edf3"/>
+            <circle cx="0" cy="0" r="2" fill="#f472b6"/>
+          </g>
+          <g>
+            <line x1="180" y1="60" x2="260" y2="90" stroke="url(#heroShoot)" stroke-width="2.5" stroke-linecap="round"/>
+            <circle cx="260" cy="90" r="2.5" fill="#ffffff"/>
+          </g>
+        </svg>
+        <div class="brand">
+          <a href="/" @click.prevent="cwd = ''"><b>FLAREDRIVE</b></a>
+          <div class="sub">INTERSTELLAR · 星际航行者</div>
+          <div class="tag">自托管 · 开源 · 深空航行中</div>
+        </div>
+      </div>
+    </div>
+    <div class="ctrl">
+      <div class="logo-chip">⌖</div>
+      <label class="ctrl-search">
+        <svg width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="#8b949e" stroke-width="2"><circle cx="11" cy="11" r="7"/><path d="M20 20l-3.5-3.5"/></svg>
+        <input
+          type="search"
+          v-model="search"
+          aria-label="Search"
+          placeholder="在星图中检索文件…" />
+      </label>
+      <div class="menu-button">
+        <button class="circle" @click="showMenu = true">
+          <span class="menu-button-text">导航 ▾</span>
+        </button>
+        <Menu v-model="showMenu"
+          :items="[{ text: '按照名称排序A-Z' }, { text: '按照大小递增排序' }, { text: '按照大小递减排序' }]"
+          @click="onMenuClick" />
+      </div>
+    </div>
+</template>
+    <div v-else class="app-bar">
       <a
         class="app-title-container"
         style="display: flex; align-items: center;"
@@ -51,6 +140,19 @@
           @click="onMenuClick" />
       </div>
     </div>
+    <div v-if="isStarship && (!shareMode || shareState === 'ready')" class="chart">
+      <nav class="crumbs">
+        <template v-for="(c, i) in crumbs" :key="c.path">
+          <a v-if="i < crumbs.length - 1" href="#" @click.prevent="cwd = c.path" :class="{ home: i === 0 }">{{ c.label }}</a>
+          <span v-else class="cur">{{ c.label }}</span>
+          <span v-if="i < crumbs.length - 1" class="chev">▸</span>
+        </template>
+      </nav>
+      <div class="ship">
+        <span class="dot"></span><span class="lbl">舰体在线</span>
+        <span class="num">v{{ appVersion }}</span>
+      </div>
+    </div>
     <div
       v-if="shareMode && shareState === 'loading'"
       style="margin: 20px 0; text-align: center">
@@ -74,7 +176,7 @@
         height="56"
         fill="none"
         aria-hidden="true">
-        <path d="M3 7a2 2 0 0 1 2-2h4l2 2h8a2 2 0 0 1 2 2v9a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V7z" fill="rgba(57, 144, 155, 0.15)" stroke="rgb(57, 144, 155)" stroke-width="1.5" stroke-linejoin="round" />
+        <path d="M3 7a2 2 0 0 1 2-2h4l2 2h8a2 2 0 0 1 2 2v9a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V7z" :fill="isStarship ? 'rgba(0, 229, 255, 0.15)' : 'rgba(57, 144, 155, 0.15)'" :stroke="isStarship ? '#00e5ff' : 'rgb(57, 144, 155)'" stroke-width="1.5" stroke-linejoin="round" />
       </svg>
       <div class="share-gate-title">受保护文件夹分享</div>
       <div class="share-gate-sub">请输入提取码查看分享内容</div>
@@ -103,7 +205,7 @@
             class="file-item"
             @click="cwd = cwd.replace(/[^\/]+\/$/, '')"
             @contextmenu.prevent>
-            <div class="file-icon">
+            <div class="file-icon tile-up">
               <svg  viewBox="0 0 576 512"
                 xmlns="http://www.w3.org/2000/svg" width="36" height="36">
                 <path d="M384 480l48 0c11.4 0 21.9-6 27.6-15.9l112-192c5.8-9.9 5.8-22.1 .1-32.1S555.5 224 544 224l-400 0c-11.4 0-21.9 6-27.6 15.9L48 357.1 48 96c0-8.8 7.2-16 16-16l117.5 0c4.2 0 8.3 1.7 11.3 4.7l26.5 26.5c21 21 49.5 32.8 79.2 32.8L416 144c8.8 0 16 7.2 16 16l0 32 48 0 0-32c0-35.3-28.7-64-64-64L298.5 96c-17 0-33.3-6.7-45.3-18.7L226.7 50.7c-12-12-28.3-18.7-45.3-18.7L64 32C28.7 32 0 60.7 0 96L0 416c0 35.3 28.7 64 64 64l23.7 0L384 480z"/>
@@ -122,7 +224,7 @@
             showContextMenu = true;
           focusedItem = folder;
           ">
-            <div class="file-icon">
+            <div class="file-icon tile-folder">
               <svg  viewBox="0 0 576 512"
                 xmlns="http://www.w3.org/2000/svg" width="36" height="36">
                 <path d="M384 480l48 0c11.4 0 21.9-6 27.6-15.9l112-192c5.8-9.9 5.8-22.1 .1-32.1S555.5 224 544 224l-400 0c-11.4 0-21.9 6-27.6 15.9L48 357.1 48 96c0-8.8 7.2-16 16-16l117.5 0c4.2 0 8.3 1.7 11.3 4.7l26.5 26.5c21 21 49.5 32.8 79.2 32.8L416 144c8.8 0 16 7.2 16 16l0 32 48 0 0-32c0-35.3-28.7-64-64-64L298.5 96c-17 0-33.3-6.7-45.3-18.7L226.7 50.7c-12-12-28.3-18.7-45.3-18.7L64 32C28.7 32 0 60.7 0 96L0 416c0 35.3 28.7 64 64 64l23.7 0L384 480z"/>
@@ -133,10 +235,11 @@
             <div
               v-if="!shareMode && siteShortlinkEnabled"
               style="margin-left: auto; margin-right: 10px;"
-              @click.stop="copyShortLink(`/?p=${encodeURIComponent(folder)}`, 'folder:' + folder)" title="复制短链">
-              <span style="font-size: 20px;">{{ copiedItem === 'folder:' + folder ? '✓' : '🔗' }}</span>
+              @click.stop="copyShortLink(`/?p=${encodeURIComponent(folder)}`, 'folder:' + folder)" title="复制短链" class="iconbtn">
+              <span v-if="copiedItem === 'folder:' + folder" :style="{ fontSize: '18px', color: isStarship ? '#7CFFB2' : '#1a7a1a' }">✓</span>
+              <svg v-else width="17" height="17" viewBox="0 0 24 24" fill="none" :stroke="isStarship ? '#c9d1d9' : '#2c2c2c'" stroke-width="1.8"><path d="M10 14a5 5 0 0 0 7 0l2-2a5 5 0 0 0-7-7l-1 1M14 10a5 5 0 0 0-7 0l-2 2a5 5 0 0 0 7 7l1-1"/></svg>
             </div>
-            <div v-if="!shareMode" style="margin-right: 10px;" @click.stop="
+            <div v-if="!shareMode" style="margin-right: 10px;" class="iconbtn" @click.stop="
               showContextMenu = true;
             focusedItem = folder;
             ">
@@ -148,7 +251,7 @@
                 xmlns="http://www.w3.org/2000/svg" p-id="6484" width="30" height="30">
                 <path
                   d="M341.333333 533.333333a128 128 0 0 1 128 128v149.333334a128 128 0 0 1-128 128H192a128 128 0 0 1-128-128v-149.333334a128 128 0 0 1 128-128h149.333333z m469.333334 0a128 128 0 0 1 128 128v149.333334a128 128 0 0 1-128 128h-149.333334a128 128 0 0 1-128-128v-149.333334a128 128 0 0 1 128-128h149.333334z m-469.333334 64H192a64 64 0 0 0-63.893333 60.245334L128 661.333333v149.333334a64 64 0 0 0 60.245333 63.893333L192 874.666667h149.333333a64 64 0 0 0 63.893334-60.245334L405.333333 810.666667v-149.333334a64 64 0 0 0-60.245333-63.893333L341.333333 597.333333z m469.333334 0h-149.333334a64 64 0 0 0-63.893333 60.245334L597.333333 661.333333v149.333334a64 64 0 0 0 60.245334 63.893333L661.333333 874.666667h149.333334a64 64 0 0 0 63.893333-60.245334L874.666667 810.666667v-149.333334a64 64 0 0 0-60.245334-63.893333L810.666667 597.333333zM341.333333 64a128 128 0 0 1 128 128v149.333333a128 128 0 0 1-128 128H192a128 128 0 0 1-128-128V192a128 128 0 0 1 128-128h149.333333z m469.333334 0a128 128 0 0 1 128 128v149.333333a128 128 0 0 1-128 128h-149.333334a128 128 0 0 1-128-128V192a128 128 0 0 1 128-128h149.333334zM341.333333 128H192a64 64 0 0 0-63.893333 60.245333L128 192v149.333333a64 64 0 0 0 60.245333 63.893334L192 405.333333h149.333333a64 64 0 0 0 63.893334-60.245333L405.333333 341.333333V192a64 64 0 0 0-60.245333-63.893333L341.333333 128z m469.333334 0h-149.333334a64 64 0 0 0-63.893333 60.245333L597.333333 192v149.333333a64 64 0 0 0 60.245334 63.893334L661.333333 405.333333h149.333334a64 64 0 0 0 63.893333-60.245333L874.666667 341.333333V192a64 64 0 0 0-60.245334-63.893333L810.666667 128z"
-                  fill="#2c2c2c" p-id="6485"></path>
+                  :fill="isStarship ? '#c9d1d9' : '#2c2c2c'" p-id="6485"></path>
               </svg>
             </div>
           </div>
@@ -174,10 +277,11 @@
               v-if="!shareMode && siteShortlinkEnabled"
               style="margin-left: auto; margin-right: 10px;"
               @click.stop="copyShortLink('/raw/' + file.key.split('/').map(encodeURIComponent).join('/'), 'file:' + file.key)"
-              title="复制短链">
-              <span style="font-size: 20px;">{{ copiedItem === 'file:' + file.key ? '✓' : '🔗' }}</span>
+              title="复制短链" class="iconbtn">
+              <span v-if="copiedItem === 'file:' + file.key" :style="{ fontSize: '18px', color: isStarship ? '#7CFFB2' : '#1a7a1a' }">✓</span>
+              <svg v-else width="17" height="17" viewBox="0 0 24 24" fill="none" :stroke="isStarship ? '#c9d1d9' : '#2c2c2c'" stroke-width="1.8"><path d="M10 14a5 5 0 0 0 7 0l2-2a5 5 0 0 0-7-7l-1 1M14 10a5 5 0 0 0-7 0l-2 2a5 5 0 0 0 7 7l1-1"/></svg>
             </div>
-            <div v-if="!shareMode" style="margin-right: 10px;" @click.stop="
+            <div v-if="!shareMode" style="margin-right: 10px;" class="iconbtn" @click.stop="
               showContextMenu = true;
             focusedItem = file;
             ">
@@ -189,7 +293,7 @@
                 xmlns="http://www.w3.org/2000/svg" p-id="6484" width="30" height="30">
                 <path
                   d="M341.333333 533.333333a128 128 0 0 1 128 128v149.333334a128 128 0 0 1-128 128H192a128 128 0 0 1-128-128v-149.333334a128 128 0 0 1 128-128h149.333333z m469.333334 0a128 128 0 0 1 128 128v149.333334a128 128 0 0 1-128 128h-149.333334a128 128 0 0 1-128-128v-149.333334a128 128 0 0 1 128-128h149.333334z m-469.333334 64H192a64 64 0 0 0-63.893333 60.245334L128 661.333333v149.333334a64 64 0 0 0 60.245333 63.893333L192 874.666667h149.333333a64 64 0 0 0 63.893334-60.245334L405.333333 810.666667v-149.333334a64 64 0 0 0-60.245333-63.893333L341.333333 597.333333z m469.333334 0h-149.333334a64 64 0 0 0-63.893333 60.245334L597.333333 661.333333v149.333334a64 64 0 0 0 60.245334 63.893333L661.333333 874.666667h149.333334a64 64 0 0 0 63.893333-60.245334L874.666667 810.666667v-149.333334a64 64 0 0 0-60.245334-63.893333L810.666667 597.333333zM341.333333 64a128 128 0 0 1 128 128v149.333333a128 128 0 0 1-128 128H192a128 128 0 0 1-128-128V192a128 128 0 0 1 128-128h149.333333z m469.333334 0a128 128 0 0 1 128 128v149.333333a128 128 0 0 1-128 128h-149.333334a128 128 0 0 1-128-128V192a128 128 0 0 1 128-128h149.333334zM341.333333 128H192a64 64 0 0 0-63.893333 60.245333L128 192v149.333333a64 64 0 0 0 60.245333 63.893334L192 405.333333h149.333333a64 64 0 0 0 63.893334-60.245333L405.333333 341.333333V192a64 64 0 0 0-60.245333-63.893333L341.333333 128z m469.333334 0h-149.333334a64 64 0 0 0-63.893333 60.245333L597.333333 192v149.333333a64 64 0 0 0 60.245334 63.893334L661.333333 405.333333h149.333334a64 64 0 0 0 63.893333-60.245333L874.666667 341.333333V192a64 64 0 0 0-60.245334-63.893333L810.666667 128z"
-                  fill="#2c2c2c" p-id="6485"></path>
+                  :fill="isStarship ? '#c9d1d9' : '#2c2c2c'" p-id="6485"></path>
               </svg>
             </div>
           </div>
@@ -198,24 +302,26 @@
     </div>
     <div
       v-if="loading && (!shareMode || shareState === 'ready')"
+      class="voyager-state"
       style="margin: 20px 0; text-align: center">
       <span style="font-size: 20px;">加载中...</span>
     </div>
-    <div v-else-if="loadError === 'forbidden' && (!shareMode || shareState === 'ready')" style="margin: 20px 0; text-align: center">
+    <div v-else-if="loadError === 'forbidden' && (!shareMode || shareState === 'ready')" class="voyager-state" style="margin: 20px 0; text-align: center">
       <span style="font-size: 20px;">该文件夹无权访问</span>
     </div>
     <div
       v-else-if="loadError && (!shareMode || shareState === 'ready')"
+      class="voyager-state"
       style="margin: 20px 0; text-align: center">
       <span style="font-size: 20px;">加载失败，请稍后重试</span>
-      <div style="margin-top: 10px;"><button @click="fetchFiles" style="padding: 8px 20px;">重试</button></div>
+      <div style="margin-top: 10px;"><button @click="fetchFiles" class="voyager-retry" style="padding: 8px 20px;">重试</button></div>
     </div>
-    <div v-else-if="(!shareMode || shareState === 'ready') && !filteredFiles.length && !filteredFolders.length" style="margin: 20px 0; text-align: center">
+    <div v-else-if="(!shareMode || shareState === 'ready') && !filteredFiles.length && !filteredFolders.length" class="voyager-state" style="margin: 20px 0; text-align: center">
       <span style="font-size: 20px;">没有文件</span>
     </div>
     <Dialog v-model="showContextMenu">
       <div
-        style="height: 50px;display: flex; justify-content: center; align-items: center; padding:10px; background: #ddd; margin: 0 0 10px 0; border-radius: 8px;">
+        style="height: 50px;display: flex; justify-content: center; align-items: center; padding:10px; background: rgba(0,229,255,0.10); border: 1px solid rgba(255,255,255,0.14); margin: 0 0 10px 0; border-radius: 8px;">
         <div
           v-text="focusedItem.key || focusedItem"
           class="contextmenu-filename"
@@ -254,10 +360,20 @@
       </ul>
     </Dialog>
     <div style="flex:1"></div>
+    <div v-if="isStarship" class="orbit">
+      <div class="line l"></div>
+      <svg class="planet" width="34" height="34" viewBox="0 0 80 80" aria-hidden="true">
+        <circle cx="40" cy="40" r="11" fill="none" stroke="#00e5ff" stroke-width="2"/>
+        <ellipse cx="40" cy="40" rx="26" ry="10" fill="none" stroke="#a78bfa" stroke-width="2" transform="rotate(-20 40 40)"/>
+        <circle cx="40" cy="40" r="5" fill="#a78bfa"/>
+      </svg>
+      <div class="line r"></div>
+    </div>
     <Footer />
     <AudioPlayer
       v-if="playerQueue.length"
       :queue="playerQueue"
+      :skin="skin"
       :start-index="playerStartIndex"
       @ended="playerQueue = []"
       @close="playerQueue = []" />
@@ -343,7 +459,6 @@ export default {
     search: '',
     showContextMenu: false,
     showMenu: false,
-    backgroundImageUrl: '/assets/bg-light.webp',
     copiedItem: null,
     loadError: '',
     // 分享模式：/s/<slug> 或 ?s=<slug> 进入；未验码前不拉任何文件列表。
@@ -360,7 +475,7 @@ export default {
     // 前端版本戳：每次部署同步 bump（见 assets/version.json）。
     // 手机浏览器常把标签页留存数日不刷新，旧代码会让视频继续走新标签页；
     // 已加载的旧页在切回可见时发现版本不一致就自动重载，之后不再有旧代码。
-    appVersion: '20261104-09',
+    appVersion: '20261104-20',
     // 播放器挂在 App 根节点，文件夹切换、前进后退、PDF 浮层都不卸载它。
     playerQueue: [],
     playerStartIndex: 0,
@@ -372,6 +487,18 @@ export default {
     // 短链总开关：公开配置 /api/site-config 的 shortlink_enabled 决定；
     // 取不到时默认开启（与旧行为一致），开关关闭时全部短链入口隐藏。
     siteShortlinkEnabled: true,
+    // Theme skin: server site-config wins; localStorage only paints
+    // the first paint before the fetch returns.
+    skin: (() => {
+      try {
+        const cached = localStorage.getItem('pan-skin');
+        return cached === 'starship' || cached === 'original'
+            ? cached : 'original';
+      } catch (e) {
+        return 'original';
+      }
+    })(),
+    backgroundImageUrl: '/assets/bg-light.webp',
     // 转码用源文件 key（VideoPlayer 播错时凭它请求 /transcode/）。
     videoKey: '',
     // 站内 PDF 预览：浮层，不走新标签页，不碰播放器。
@@ -399,6 +526,10 @@ export default {
       return p === '/admin' || p.startsWith('/admin/');
     },
 
+    isStarship() {
+      return this.skin === 'starship';
+    },
+
     shareMode() {
       return !!this.shareSlug;
     },
@@ -420,9 +551,45 @@ export default {
       }
       return folders;
     },
+
+    // 星图路径：由 cwd 生成；分享模式以 shareRoot 为根，绝不越出授权前缀。
+    crumbs() {
+      const norm = (p) => (p || '').replace(/\/+$/, '');
+      const base = this.shareMode ? (this.shareRoot || '') : '';
+      const rel = norm(this.cwd).slice(norm(base).length).replace(/^\/+/, '');
+      const segs = rel ? rel.split('/') : [];
+      const out = [{ label: '⌖ 根星域', path: base }];
+      let acc = base;
+      segs.forEach((s) => {
+        acc = acc ? acc + s + '/' : s + '/';
+        out.push({ label: s, path: acc });
+      });
+      return out;
+    },
   },
 
   methods: {
+    // 一键换装：dataset + localStorage + favicon 一次写完，当前页立即
+    // 生效、不刷新。优先走 <head> 里的共享助手，未加载时本地兜底。
+    applySkin(skin) {
+      if (skin !== 'starship' && skin !== 'original') return;
+      if (window.__panSkin) {
+        window.__panSkin.applySkin(skin);
+        return;
+      }
+      document.documentElement.dataset.skin = skin;
+      try { localStorage.setItem('pan-skin', skin); }
+      catch (e) {}
+      const links = document.querySelectorAll('link[rel="icon"]');
+      links.forEach((l) => l.parentNode && l.parentNode.removeChild(l));
+      const link = document.createElement('link');
+      link.rel = 'icon';
+      link.type = 'image/png';
+      link.href = skin === 'starship'
+          ? '/assets/planet-favicon.png?v=2' : '/favicon.ico';
+      document.head.appendChild(link);
+    },
+
     copyLink(link) {
       const url = new URL(link, window.location.origin);
       navigator.clipboard.writeText(url.toString());
@@ -888,14 +1055,32 @@ export default {
   created() {
     if (this.shareMode) this.shareLoad();
     // 短链总开关：开关关闭时全部短链入口隐藏（见 siteShortlinkEnabled）。
+    this.applySkin(this.skin);
     fetch('/api/site-config')
       .then((res) => res.json())
       .then((data) => {
         if (data && typeof data.shortlink_enabled === 'boolean') {
           this.siteShortlinkEnabled = data.shortlink_enabled;
         }
+        if (data && (data.skin === 'starship'
+            || data.skin === 'original')) {
+          this.skin = data.skin;
+          this.applySkin(data.skin);
+        } else {
+          this.applySkin(this.skin);
+        }
       })
       .catch(() => {});
+    // 跨页签联动：管理页换肤写 localStorage 后，其他已打开的页收到
+    // storage 事件即时跟换，不刷新。
+    this._onSkinStorage = (e) => {
+      if (e.key === 'pan-skin' && (e.newValue === 'starship'
+          || e.newValue === 'original')) {
+        this.skin = e.newValue;
+        this.applySkin(e.newValue);
+      }
+    };
+    window.addEventListener('storage', this._onSkinStorage);
     // 版本自救：见 checkAppVersion（旧标签页切回可见时自动刷新到新代码）。
     this.checkAppVersion();
     this._onVisibilityChange = () => {

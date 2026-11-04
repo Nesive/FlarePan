@@ -121,15 +121,15 @@ export default {
   text-overflow: ellipsis;
 }
 .image-count {
-  color: #bbb;
+  color: #8b949e;
   font-size: 14px;
   white-space: nowrap;
 }
 .image-btn {
-  border: 1px solid rgba(255, 255, 255, 0.35);
-  background: transparent;
-  color: #fff;
-  border-radius: 8px;
+  border: 1px solid rgba(0, 229, 255, 0.45);
+  background: rgba(12, 9, 36, 0.75);
+  color: #e6edf3;
+  border-radius: 12px;
   padding: 6px 12px;
   cursor: pointer;
   text-decoration: none;
@@ -164,10 +164,10 @@ export default {
   transform: translateY(-50%);
   width: 44px;
   height: 44px;
-  border-radius: 50%;
-  border: none;
-  background: rgba(255, 255, 255, 0.16);
-  color: #fff;
+  border-radius: 12px;
+  border: 1px solid rgba(0, 229, 255, 0.45);
+  background: rgba(12, 9, 36, 0.75);
+  color: #e6edf3;
   font-size: 26px;
   cursor: pointer;
   z-index: 1;
@@ -187,6 +187,6 @@ export default {
   text-align: center;
 }
 .image-error a {
-  color: #7fd4dd;
+  color: #00e5ff;
 }
 </style>

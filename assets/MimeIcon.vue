@@ -1,5 +1,7 @@
 <script setup>
-defineProps({
+import { computed } from 'vue';
+
+const props = defineProps({
   contentType: {
     type: String,
     default: '',
@@ -13,10 +15,22 @@ defineProps({
     default: 36,
   },
 });
+
+// 图标底色块：只按类型分色，不碰任何行为逻辑。
+const tileClass = computed(() => {
+  const ct = props.contentType || '';
+  if (['application/gzip', 'application/vnd.rar', 'application/zip'].includes(ct)) return 'tile-zip';
+  if (ct === 'application/pdf') return 'tile-pdf';
+  if (ct.startsWith('video/')) return 'tile-video';
+  if (ct.startsWith('audio/')) return 'tile-audio';
+  if (ct.startsWith('image/')) return 'tile-image';
+  if (ct.startsWith('text/') || ct.includes('json') || ct.includes('xml') || ct.includes('javascript')) return 'tile-doc';
+  return 'tile-other';
+});
 </script>
 
 <template>
-  <div class="file-icon">
+  <div class="file-icon" :class="tileClass">
     <img
       v-if="thumbnail && contentType.startsWith('image/') && contentType !== 'image/svg+xml'"
       :src="thumbnail"

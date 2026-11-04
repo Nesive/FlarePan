@@ -64,7 +64,7 @@ export default {
   word-break: break-all;
 }
 .info-meta {
-  color: #888;
+  color: #8b949e;
   font-size: 13px;
 }
 .info-note {
@@ -78,12 +78,12 @@ export default {
   margin-top: 6px;
 }
 .info-btn {
-  border: 1px solid #d0d0d0;
-  background: #fff;
-  border-radius: 8px;
+  border: 1px solid rgba(0, 229, 255, 0.45);
+  background: rgba(255, 255, 255, 0.07);
+  border-radius: 12px;
   padding: 8px 20px;
   cursor: pointer;
-  color: #39909b;
+  color: #e6edf3;
   text-decoration: none;
   font-size: 14px;
 }

@@ -12,6 +12,7 @@ import { parseBucketPath } from '@/utils/bucket';
 import {
   checkUpload,
   recordUpload,
+  removeLedgerRow,
   sweepExpired,
 } from '@/utils/upload-limits';
 import {
@@ -72,19 +73,47 @@ export async function onRequestPost(context) {
   if (!canWritePath(key, gate, rules)) {
     return json({ error: 'forbidden' }, 403);
   }
+  // Record whether an object already exists at this key before the PUT:
+  // rollback and cleanup must never delete a pre-existing file, only
+  // residue left by this upload attempt.
+  let existedBefore;
+  try {
+    existedBefore = (await bucket.head(key)) !== null;
+  } catch {
+    return json({ error: 'upload_failed' }, 500);
+  }
   const data = await file.arrayBuffer();
   const identity = 'admin:' + (gate.user || 'unknown');
   const denied = await checkUpload(
     db, key, data.byteLength, identity, Date.now());
   if (denied) {
-    return json({ error: denied.code }, denied.status);
+    return json({ error: denied.code, key, existedBefore }, denied.status);
   }
-  await bucket.put(key, data, {
-    httpMetadata: file.type ? { contentType: file.type } : undefined,
-  });
-  await recordUpload(db, key, data.byteLength, identity, Date.now());
-  await sweepExpired(db, bucket, Date.now(), 50);
-  return json({ key, size: data.byteLength });
+  try {
+    await bucket.put(key, data, {
+      httpMetadata: file.type ? { contentType: file.type } : undefined,
+    });
+    await recordUpload(db, key, data.byteLength, identity, Date.now());
+    await sweepExpired(db, bucket, Date.now(), 50);
+  } catch {
+    // PUT, record, or sweep failed: roll back only residue from this
+    // attempt. A pre-existing file is left untouched (its object and
+    // ledger row stay as they were).
+    if (!existedBefore) {
+      try {
+        await bucket.delete(key);
+      } catch {
+        // Best effort: the error below is reported regardless.
+      }
+      try {
+        await removeLedgerRow(db, key);
+      } catch {
+        // Best effort.
+      }
+    }
+    return json({ error: 'upload_failed', key, existedBefore }, 500);
+  }
+  return json({ key, size: data.byteLength, existedBefore });
 }
 
 export async function onRequest(context) {

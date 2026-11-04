@@ -58,6 +58,9 @@
         <button
           :class="{ on: tab === 'limits' }"
           @click="switchTab('limits')">上传限制</button>
+        <button
+          :class="{ on: tab === 'skin' }"
+          @click="switchTab('skin')">主题皮肤</button>
       </nav>
       <div v-if="globalError" class="admin-error">{{ globalError }}</div>
 
@@ -115,10 +118,63 @@
         <div v-if="!filesLoading && !files.length && !folders.length && !filesError" class="admin-empty">没有文件</div>
         <div class="admin-box">
           <h3>上传到当前目录</h3>
-          <input type="file" ref="uploadInput" />
-          <button @click="uploadFile">上传</button>
+          <input
+            type="file"
+            ref="uploadInput"
+            multiple
+            @change="onPickFiles"
+            :disabled="uploading"
+            style="display: none" />
+          <div class="admin-row">
+            <button @click="pickFiles" :disabled="uploading">选择文件</button>
+            <button
+              @click="startUploadBatch"
+              :disabled="uploading || !uploadQueue.length"
+              class="admin-btn-primary">{{ uploading ? '上传中…' : '开始上传' }}</button>
+          </div>
+          <div v-if="uploading" class="admin-busy">正在上传 {{ uploadBatchIndex }}/{{ uploadBatchCount }} · {{ totalPercent }}% · {{ formatSize(uploadBatchLoaded) }}/{{ formatSize(uploadBatchTotal) }}</div>
+          <div v-if="uploadQueue.length" class="admin-upload-queue">
+            <div v-for="row in uploadQueue" :key="row.id" class="admin-upload-row">
+              <div class="admin-upload-row-top">
+                <span class="admin-upload-name" :title="row.name">{{ row.name }}</span>
+                <span :class="'admin-upload-pill admin-upload-pill-' + row.status">{{ uploadStatusText(row) }}</span>
+              </div>
+              <div class="admin-progress">
+                <div class="admin-progress-fill" :style="{ width: row.percent + '%' }"></div>
+              </div>
+              <div class="admin-upload-row-bottom">
+                <span class="admin-upload-meta">{{ formatSize(row.loaded) }} / {{ formatSize(row.size) }} · {{ row.percent }}%</span>
+                <span v-if="row.error" class="admin-upload-error">{{ row.error }}</span>
+                <span v-if="row.note" class="admin-upload-note">{{ row.note }}</span>
+                <span class="admin-upload-actions">
+                  <button
+                    v-if="row.status === 'failed' || row.status === 'cleaned'"
+                    @click="retryRow(row)"
+                    :disabled="uploading">重试</button>
+                  <button
+                    v-if="row.status === 'failed' || row.status === 'cleaned'"
+                    @click="cleanAndRetryRow(row)"
+                    :disabled="uploading">清理并重试</button>
+                  <button
+                    v-if="row.status === 'queued' || row.status === 'failed' || row.status === 'cleaned'"
+                    @click="removeRow(row)"
+                    :disabled="uploading">移除</button>
+                </span>
+              </div>
+            </div>
+          </div>
+          <div v-if="uploadQueue.length" class="admin-upload-batchbar">
+            <button @click="retryAllFailed" :disabled="uploading || !hasFailedRows">重试全部失败</button>
+            <button @click="clearDoneRows" :disabled="uploading || !hasDoneRows">清空已完成</button>
+            <div v-if="uploadBatchCount" class="admin-upload-totalbar">
+              <span class="admin-upload-total">总进度 {{ formatSize(uploadBatchLoaded) }} / {{ formatSize(uploadBatchTotal) }} · {{ totalPercent }}%</span>
+              <div class="admin-progress">
+                <div class="admin-progress-fill" :style="{ width: totalPercent + '%' }"></div>
+              </div>
+            </div>
+          </div>
+          <div v-if="uploadSummary" class="admin-ok">{{ uploadSummary }}</div>
           <div v-if="uploadError" class="admin-error">{{ uploadError }}</div>
-          <div v-if="uploadOk" class="admin-ok">{{ uploadOk }}</div>
         </div>
         <div class="admin-box">
           <h3>新建文件夹</h3>
@@ -278,19 +334,18 @@
         <h2>WebDAV</h2>
         <div v-if="davError" class="admin-error">{{ davError }}</div>
         <div v-if="davOk" class="admin-ok">{{ davOk }}</div>
-        <label class="admin-row">
-          <input
-            type="checkbox"
-            v-model="davEnabled"
-            :disabled="davEnabled === null" />
-          启用 WebDAV
-        </label>
         <div class="admin-row">
-          <button
-            @click="saveDav"
-            :disabled="davEnabled === null"
-            class="admin-btn-primary">保存</button>
+          <label class="switch-row">
+            <span class="switch-label">启用 WebDAV</span>
+            <span class="switch">
+              <input type="checkbox" v-model="davEnabled" @change="saveDav" :disabled="davSwitchBusy || davEnabled === null" />
+              <span class="switch-track"><span class="switch-thumb"></span></span>
+            </span>
+            <span class="switch-hint">{{ davSwitchBusy ? '保存中…' : (davEnabled ? '已开启' : '已关闭') }}</span>
+          </label>
         </div>
+        <div v-if="davEnabled === false" class="admin-desc">WebDAV 功能已关闭：DAV 接口会拒绝全部请求，客户端将无法连接。重新打开上方开关即可恢复。</div>
+        <div v-if="davEnabled">
         <div class="admin-box">
           <div>WebDAV 地址：<code>{{ davAddr }}</code>
             <button @click="copyDavAddr">复制</button>
@@ -309,6 +364,7 @@ vendor = other
 user = &lt;你的账号&gt;
 pass = &lt;你的密码&gt;</pre>
           <p>每账号的 DAV 开关在“账号”页里单独设置。</p>
+        </div>
         </div>
       </section>
 
@@ -448,26 +504,65 @@ pass = &lt;你的密码&gt;</pre>
         </div>
       </section>
 
+      <section v-if="tab === 'skin'">
+        <h2>主题皮肤</h2>
+        <p class="admin-desc">皮肤是全站设置，点一下立即换装，其他已打开的页面也会同步换装。默认皮肤为原始主题。</p>
+        <div v-if="skinError" class="admin-error">{{ skinError }}</div>
+        <div v-if="skinOk" class="admin-ok">{{ skinOk }}</div>
+        <div class="admin-skin-cards">
+          <div class="admin-skin-card" :class="{ on: skinLocal === 'original' }">
+            <h3>原始主题</h3>
+            <p>浅色清新语言：青色点缀、半透明面板、圆润字体。</p>
+            <span v-if="skinLocal === 'original'" class="admin-skin-current">当前</span>
+            <button v-else :disabled="skinSaving" @click="saveSkin('original')" class="admin-btn-primary">设为当前</button>
+          </div>
+          <div class="admin-skin-card" :class="{ on: skinLocal === 'starship' }">
+            <h3>星际航行者</h3>
+            <p>深空渐变、星云行星、玻璃拟态，科幻舰桥风。</p>
+            <span v-if="skinLocal === 'starship'" class="admin-skin-current">当前</span>
+            <button v-else :disabled="skinSaving" @click="saveSkin('starship')" class="admin-btn-primary">设为当前</button>
+          </div>
+        </div>
+      </section>
+
       <section v-if="tab === 'limits'">
         <h2>上传限制</h2>
         <p class="admin-desc">防恶意上传的额度：单文件上限、每身份每日量、存储总量、过期时间。总量填 0 表示不限量，过期填 0 表示永不过期；其余两项必须大于 0。过期文件在每次上传时顺带清理（每次最多 50 条），总量上限是硬兜底，即使清理延迟也不会冲爆额度。</p>
         <div v-if="limitError" class="admin-error">{{ limitError }}</div>
         <div v-if="limitOk" class="admin-ok">{{ limitOk }}</div>
-        <div class="admin-row">
-          <span>单文件上限（MB）</span>
-          <input v-model.number="limitMaxFile" type="number" min="1" />
-        </div>
-        <div class="admin-row">
-          <span>每身份每日量（MB）</span>
-          <input v-model.number="limitDaily" type="number" min="1" />
-        </div>
-        <div class="admin-row">
-          <span>存储总量（MB，0 = 不限）</span>
-          <input v-model.number="limitTotal" type="number" min="0" />
-        </div>
-        <div class="admin-row">
-          <span>过期时间（小时，0 = 永不过期）</span>
-          <input v-model.number="limitExpiry" type="number" min="0" />
+        <div class="admin-limit-grid">
+          <div class="admin-limit-card">
+            <div class="admin-limit-label">单文件上限</div>
+            <div class="admin-limit-field">
+              <input v-model.number="limitMaxFile" type="number" min="1" />
+              <span class="admin-limit-unit">MB</span>
+            </div>
+            <div class="admin-limit-hint">必须大于 0</div>
+          </div>
+          <div class="admin-limit-card">
+            <div class="admin-limit-label">每身份每日量</div>
+            <div class="admin-limit-field">
+              <input v-model.number="limitDaily" type="number" min="1" />
+              <span class="admin-limit-unit">MB</span>
+            </div>
+            <div class="admin-limit-hint">必须大于 0</div>
+          </div>
+          <div class="admin-limit-card">
+            <div class="admin-limit-label">存储总量</div>
+            <div class="admin-limit-field">
+              <input v-model.number="limitTotal" type="number" min="0" />
+              <span class="admin-limit-unit">MB</span>
+            </div>
+            <div class="admin-limit-hint">0 = 不限量</div>
+          </div>
+          <div class="admin-limit-card">
+            <div class="admin-limit-label">过期时间</div>
+            <div class="admin-limit-field">
+              <input v-model.number="limitExpiry" type="number" min="0" />
+              <span class="admin-limit-unit">小时</span>
+            </div>
+            <div class="admin-limit-hint">0 = 永不过期</div>
+          </div>
         </div>
         <div class="admin-row">
           <button @click="saveLimits" class="admin-btn-primary">保存</button>
@@ -553,7 +648,16 @@ export default {
     filesLoading: false,
     filesError: '',
     uploadError: '',
-    uploadOk: '',
+    uploadSummary: '',
+    uploadQueue: [],
+    uploadQueueSeq: 0,
+    uploading: false,
+    uploadLoginExpired: false,
+    uploadBatchIds: [],
+    uploadBatchIndex: 0,
+    uploadBatchCount: 0,
+    uploadBatchLoaded: 0,
+    uploadBatchTotal: 0,
     newFolderName: '',
     actionError: '',
     actionOk: '',
@@ -593,11 +697,17 @@ export default {
     pickerFailed: [],
     // WebDAV
     davEnabled: null,
+    davSwitchBusy: false,
     davError: '',
     davOk: '',
     davCopyOk: '',
     // 短链（总开关：关闭时全部短链入口与配置区隐藏，开关本身常驻）。
     shortenEnabled: true,
+    // Theme skin: site-wide setting stored in D1 settings (key skin).
+    skinLocal: 'original',
+    skinSaving: false,
+    skinError: '',
+    skinOk: '',
     shortenSwitchBusy: false,
     shortenBaseUrl: '',
     shortenToken: '',
@@ -656,6 +766,21 @@ export default {
       .shareUrl : '';
     },
 
+    hasFailedRows() {
+      return this.uploadQueue.some((row) => row.status === 'failed'
+        || row.status === 'cleaned');
+    },
+
+    hasDoneRows() {
+      return this.uploadQueue.some((row) => row.status === 'done');
+    },
+
+    totalPercent() {
+      if (!this.uploadBatchTotal) return 0;
+      return Math.min(100,
+        Math.round((this.uploadBatchLoaded / this.uploadBatchTotal) * 100));
+    },
+
     // 规则账号下拉选项：D1 账号表 + 当前登录账号（env-admin 可能不在表里，
     // 不补进来的话它反而建不了规则）。
     permUserOptions() {
@@ -679,6 +804,27 @@ export default {
   },
 
   methods: {
+    // 一键换装：dataset + localStorage + favicon 一次写完，当前页立即
+    // 生效、不刷新。优先走 <head> 里的共享助手，未加载时本地兜底。
+    applySkin(skin) {
+      if (skin !== 'starship' && skin !== 'original') return;
+      if (window.__panSkin) {
+        window.__panSkin.applySkin(skin);
+        return;
+      }
+      document.documentElement.dataset.skin = skin;
+      try { localStorage.setItem('pan-skin', skin); }
+      catch (e) {}
+      const links = document.querySelectorAll('link[rel="icon"]');
+      links.forEach((l) => l.parentNode && l.parentNode.removeChild(l));
+      const link = document.createElement('link');
+      link.rel = 'icon';
+      link.type = 'image/png';
+      link.href = skin === 'starship'
+          ? '/assets/planet-favicon.png?v=2' : '/favicon.ico';
+      document.head.appendChild(link);
+    },
+
     async readJson(res) {
       try {
         return await res.json();
@@ -755,6 +901,40 @@ export default {
       this.loginPass = '';
     },
 
+    async saveSkin(skin) {
+      this.skinError = '';
+      this.skinOk = '';
+      this.skinSaving = true;
+      try {
+        const res = await fetch('/api/admin/skin', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ skin }),
+        });
+        if (res.status === 401) {
+          this.goLogin('登录已失效，请重新登录');
+          return;
+        }
+        if (!res.ok) {
+          const data = await this.readJson(res);
+          this.skinError = data.error ? `保存失败：${data.error}`
+              : '保存失败，请重试';
+          return;
+        }
+        const data = await res.json();
+        this.skinLocal = data.skin || skin;
+        try { localStorage.setItem('pan-skin', this.skinLocal); }
+        catch (e) {}
+        // 一键换装：保存成功即在当前页生效，不用刷新。
+        this.applySkin(this.skinLocal);
+        this.skinOk = '已切换，全站即时生效';
+      } catch (e) {
+        this.skinError = '保存失败，请重试';
+      } finally {
+        this.skinSaving = false;
+      }
+    },
+
     switchTab(t) {
       this.tab = t;
       this.globalError = '';
@@ -822,35 +1002,263 @@ export default {
       this.fetchFilesAdmin();
     },
 
-    async uploadFile() {
-      this.uploadError = '';
-      this.uploadOk = '';
+    uploadStatusText(row) {
+      if (row.status === 'queued') return '排队';
+      if (row.status === 'uploading') return '上传中';
+      if (row.status === 'done') return '成功';
+      if (row.status === 'cleaned') return '已清理';
+      return '失败';
+    },
+
+    uploadErrorText(status, code) {
+      if (status === 413 || code === 'upload_too_large') return '单文件超出上限';
+      if (status === 429 || code === 'daily_quota_exceeded') {
+        return '今日上传额度已满';
+      }
+      if (status === 507 || code === 'storage_quota_exceeded') {
+        return '存储总量已满';
+      }
+      if (status === 403 || code === 'forbidden') return '无写权限';
+      if (status === 401) return '登录失效';
+      return '上传失败，请重试';
+    },
+
+    pickFiles() {
       const input = this.$refs.uploadInput;
-      if (!input || !input.files || !input.files.length) {
-        this.uploadError = '请先选择要上传的文件';
+      if (input) input.click();
+    },
+
+    onPickFiles() {
+      const input = this.$refs.uploadInput;
+      if (!input || !input.files) return;
+      let dup = 0;
+      for (const file of Array.from(input.files)) {
+        const exists = this.uploadQueue.some((row) => row.name === file.name
+          && row.size === file.size);
+        if (exists) {
+          dup += 1;
+          continue;
+        }
+        this.uploadQueueSeq += 1;
+        this.uploadQueue.push({
+          id: this.uploadQueueSeq,
+          file,
+          name: file.name,
+          size: file.size,
+          status: 'queued',
+          loaded: 0,
+          percent: 0,
+          error: '',
+          note: '',
+          cleaned: false,
+          existedBefore: null,
+          key: '',
+        });
+      }
+      input.value = '';
+      this.uploadError = dup
+        ? `已跳过 ${dup} 个重复文件（同名同大小已在队列中）`
+        : '';
+    },
+
+    removeRow(row) {
+      this.uploadQueue = this.uploadQueue.filter((item) => item.id !== row.id);
+    },
+
+    clearDoneRows() {
+      this.uploadQueue = this.uploadQueue.filter(
+        (row) => row.status !== 'done');
+    },
+
+    updateBatchProgress() {
+      let loaded = 0;
+      for (const row of this.uploadQueue) {
+        if (!this.uploadBatchIds.includes(row.id)) continue;
+        loaded += row.status === 'done' ? row.size : row.loaded;
+      }
+      this.uploadBatchLoaded = loaded;
+    },
+
+    uploadOneFile(row) {
+      return new Promise((resolve) => {
+        const fd = new FormData();
+        fd.append('file', row.file);
+        fd.append('path', this.cwd);
+        const xhr = new XMLHttpRequest();
+        xhr.open('POST', '/api/admin/files/upload', true);
+        xhr.upload.onprogress = (e) => {
+          row.loaded = e.loaded;
+          row.percent = row.size
+            ? Math.min(100, Math.round((e.loaded / row.size) * 100))
+            : 0;
+          this.updateBatchProgress();
+        };
+        xhr.onload = () => {
+          let data = {};
+          try {
+            data = JSON.parse(xhr.responseText);
+          } catch (e) {
+            data = {};
+          }
+          if (xhr.status === 401) {
+            this.uploadLoginExpired = true;
+            this.goLogin('登录已失效，请重新登录');
+            row.status = 'failed';
+            row.error = '登录失效';
+            resolve(false);
+            return;
+          }
+          if (typeof data.existedBefore === 'boolean') {
+            row.existedBefore = data.existedBefore;
+          }
+          if (typeof data.key === 'string') row.key = data.key;
+          if (xhr.status >= 200 && xhr.status < 300) {
+            row.status = 'done';
+            row.loaded = row.size;
+            row.percent = 100;
+            row.error = '';
+            row.note = '';
+            this.updateBatchProgress();
+            resolve(true);
+            return;
+          }
+          row.status = 'failed';
+          row.error = this.uploadErrorText(xhr.status, data.error);
+          resolve(false);
+        };
+        xhr.onerror = () => {
+          row.status = 'failed';
+          row.error = '上传失败，请重试';
+          resolve(false);
+        };
+        xhr.send(fd);
+      });
+    },
+
+    async autoCleanupRow(row) {
+      // Only clean when the failed attempt reported where it wrote:
+      // without a key and existedBefore flag, cleanup could target the
+      // wrong object, so it is skipped and the row stays retryable.
+      if (!row.key || typeof row.existedBefore !== 'boolean') {
+        row.note = '可重试';
         return;
       }
-      const fd = new FormData();
-      fd.append('file', input.files[0]);
-      fd.append('path', this.cwd);
       try {
-        const res = await fetch('/api/admin/files/upload',
-        { method: 'POST', body: fd });
+        const res = await fetch('/api/admin/files/cleanup', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            key: row.key,
+            existedBefore: row.existedBefore,
+          }),
+        });
         if (res.status === 401) {
           this.goLogin('登录已失效，请重新登录');
+          row.note = '可重试';
           return;
         }
+        const data = await this.readJson(res);
         if (!res.ok) {
-          const data = await this.readJson(res);
-          this.uploadError = data.error ? `上传失败：${data.error}` : '上传失败，请重试';
+          row.note = '清理失败，可重试';
           return;
         }
-        this.uploadOk = '上传成功';
-        input.value = '';
-        this.fetchFilesAdmin();
+        if (data.deletedObject || data.deletedReservations) {
+          row.status = 'cleaned';
+          row.cleaned = true;
+          row.note = '已清理残留，可重试';
+        } else if (data.reason === 'has_ledger') {
+          row.note = '已有账本记录，对象与账本未动，可重试';
+        } else if (data.reason === 'existed_before') {
+          row.note = '上传前文件已存在，未动旧文件，可重试';
+        } else {
+          row.note = '无残留，可重试';
+        }
       } catch (e) {
-        this.uploadError = '上传失败，请重试';
+        row.note = '清理失败，可重试';
       }
+    },
+
+    async runUploadRows(rows) {
+      if (this.uploading) return null;
+      this.uploading = true;
+      this.uploadError = '';
+      this.uploadSummary = '';
+      this.uploadLoginExpired = false;
+      this.uploadBatchIds = rows.map((row) => row.id);
+      this.uploadBatchTotal = rows.reduce((sum, row) => sum + row.size, 0);
+      this.uploadBatchCount = rows.length;
+      this.uploadBatchIndex = 0;
+      this.uploadBatchLoaded = 0;
+      let ok = 0;
+      let fail = 0;
+      for (const row of rows) {
+        if (this.uploadLoginExpired) break;
+        this.uploadBatchIndex += 1;
+        row.status = 'uploading';
+        row.loaded = 0;
+        row.percent = 0;
+        row.error = '';
+        row.note = '';
+        row.cleaned = false;
+        const done = await this.uploadOneFile(row);
+        if (this.uploadLoginExpired) break;
+        if (done) {
+          ok += 1;
+        } else {
+          fail += 1;
+          await this.autoCleanupRow(row);
+        }
+        this.updateBatchProgress();
+      }
+      this.uploading = false;
+      if (!this.uploadLoginExpired) {
+        this.uploadSummary = `${ok} 个成功，${fail} 个失败`;
+        if (ok) this.fetchFilesAdmin();
+      }
+      return { ok, fail };
+    },
+
+    async startUploadBatch() {
+      const rows = this.uploadQueue.filter((row) => row.status === 'queued'
+        || row.status === 'failed' || row.status === 'cleaned');
+      if (!rows.length) {
+        this.uploadError = '没有可上传的文件';
+        return;
+      }
+      await this.runUploadRows(rows);
+    },
+
+    async retryRow(row) {
+      await this.runUploadRows([row]);
+    },
+
+    async retryAllFailed() {
+      const rows = this.uploadQueue.filter((row) => row.status === 'failed'
+        || row.status === 'cleaned');
+      if (rows.length) await this.runUploadRows(rows);
+    },
+
+    async cleanAndRetryRow(row) {
+      if (this.uploading) return;
+      if (row.key && typeof row.existedBefore === 'boolean') {
+        try {
+          const res = await fetch('/api/admin/files/cleanup', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({
+              key: row.key,
+              existedBefore: row.existedBefore,
+            }),
+          });
+          if (res.status === 401) {
+            this.goLogin('登录已失效，请重新登录');
+            return;
+          }
+        } catch (e) {
+          // 清理失败仍继续重试：新上传会重新判断并回滚自身残留。
+        }
+      }
+      await this.runUploadRows([row]);
     },
 
     async adminFileAction(body) {
@@ -1363,6 +1771,7 @@ export default {
     },
 
     async saveDav() {
+      this.davSwitchBusy = true;
       this.davError = '';
       this.davOk = '';
       try {
@@ -1375,14 +1784,17 @@ export default {
           this.goLogin('登录已失效，请重新登录');
           return;
         }
+        const data = await this.readJson(res);
         if (!res.ok) {
-          const data = await this.readJson(res);
           this.davError = data.error ? `保存失败：${data.error}` : '保存失败，请重试';
           return;
         }
-        this.davOk = '已保存';
+        this.davEnabled = !!data.enabled;
+        this.davOk = this.davEnabled ? 'WebDAV 已开启' : 'WebDAV 已关闭，DAV 接口会拒绝请求';
       } catch (e) {
         this.davError = '保存失败，请重试';
+      } finally {
+        this.davSwitchBusy = false;
       }
     },
 
@@ -2074,8 +2486,23 @@ export default {
         if (data && typeof data.shortlink_enabled === 'boolean') {
           this.shortenEnabled = data.shortlink_enabled;
         }
+        if (data && (data.skin === 'starship'
+            || data.skin === 'original')) {
+          this.skinLocal = data.skin;
+          this.applySkin(data.skin);
+        }
       })
       .catch(() => {});
+    // 跨页签联动：另一页换肤写 localStorage 后，本页收到 storage 事件
+    // 即时跟换，不刷新。
+    this._onSkinStorage = (e) => {
+      if (e.key === 'pan-skin' && (e.newValue === 'starship'
+          || e.newValue === 'original')) {
+        this.skinLocal = e.newValue;
+        this.applySkin(e.newValue);
+      }
+    };
+    window.addEventListener('storage', this._onSkinStorage);
   },
 };
 </script>
@@ -2122,6 +2549,7 @@ export default {
 }
 .admin-page input[type="text"],
 .admin-page input[type="password"],
+.admin-page input[type="number"],
 .admin-page input:not([type]) {
   background-color: whitesmoke;
   border: none;
@@ -2129,6 +2557,54 @@ export default {
   padding: 10px 14px;
   box-sizing: border-box;
   font-size: 15px;
+}
+/* 上传限制卡片：数字输入框与其它输入框同款圆角底，单位后缀与提示
+   分行排布，不再是裸 label + 裸 number 输入框。 */
+.admin-limit-grid {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 12px;
+  margin: 12px 0;
+}
+.admin-limit-card {
+  background: rgba(255, 255, 255, 0.65);
+  backdrop-filter: blur(10px);
+  border-radius: 12px;
+  box-shadow: 0 4px 8px rgba(0, 0, 0, 0.1);
+  padding: 16px;
+}
+.admin-limit-label {
+  font-size: 15px;
+  margin-bottom: 8px;
+}
+.admin-limit-field {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+.admin-limit-field input {
+  flex: 1;
+  min-width: 0;
+}
+/* 数字输入框去掉浏览器默认上下箭头，改走键盘输入，与其它输入框一样干净 */
+.admin-limit-field input::-webkit-outer-spin-button,
+.admin-limit-field input::-webkit-inner-spin-button {
+  -webkit-appearance: none;
+  margin: 0;
+}
+.admin-limit-field input[type="number"] {
+  -moz-appearance: textfield;
+  appearance: textfield;
+}
+.admin-limit-unit {
+  font-size: 14px;
+  color: dimgray;
+  flex-shrink: 0;
+}
+.admin-limit-hint {
+  font-size: 13px;
+  color: dimgray;
+  margin-top: 6px;
 }
 .admin-page select {
   background-color: whitesmoke;
@@ -2523,17 +2999,6 @@ export default {
   font-size: 15px;
   margin: 20px 0 4px;
 }
-.admin-details {
-  background: rgba(255, 255, 255, 0.5);
-  border-radius: 10px;
-  padding: 12px 16px;
-  margin: 16px 0;
-}
-.admin-details summary {
-  cursor: pointer;
-  font-size: 14px;
-  color: dimgray;
-}
 .admin-box {
   background: rgba(255, 255, 255, 0.75);
   border-radius: 10px;
@@ -2631,5 +3096,131 @@ export default {
     margin-left: 0;
     flex-basis: 100%;
   }
+  /* 上传限制卡片窄屏单列 */
+  .admin-limit-grid {
+    grid-template-columns: 1fr;
+  }
+}
+
+/* Admin upload queue: layout matches the starship layer; palette uses
+   the original light language. */
+.admin-upload-row {
+  border: 1px solid #ddd;
+  border-radius: 10px;
+  padding: 10px 12px;
+  margin: 10px 0;
+}
+.admin-upload-row-top {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+.admin-upload-name {
+  flex: 1;
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.admin-upload-pill {
+  flex: none;
+  font-size: 13px;
+  padding: 2px 10px;
+  border-radius: 50px;
+  background: whitesmoke;
+}
+.admin-upload-pill-uploading {
+  background: rgba(57, 144, 155, 0.12);
+  color: rgb(45, 115, 124);
+}
+.admin-upload-pill-done {
+  color: #1a7a1a;
+  background: rgba(26, 122, 26, 0.08);
+}
+.admin-upload-pill-failed {
+  color: #c00;
+  background: rgba(204, 0, 0, 0.07);
+}
+.admin-upload-pill-cleaned {
+  color: #5b21b6;
+  background: rgba(124, 58, 237, 0.10);
+}
+.admin-progress {
+  height: 8px;
+  border-radius: 4px;
+  background: rgba(0, 0, 0, 0.08);
+  overflow: hidden;
+  margin: 8px 0;
+}
+.admin-progress-fill {
+  height: 100%;
+  background: rgb(57, 144, 155);
+  transition: width 0.2s ease;
+}
+.admin-upload-row-bottom {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 8px;
+  font-size: 13px;
+}
+.admin-upload-meta {
+  color: dimgray;
+}
+.admin-upload-note {
+  color: #2c2c2c;
+}
+.admin-upload-error {
+  color: #c00;
+}
+.admin-upload-actions {
+  margin-left: auto;
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+}
+.admin-upload-actions button {
+  font-size: 13px;
+  padding: 4px 10px;
+}
+.admin-upload-batchbar {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  align-items: center;
+  margin-top: 12px;
+}
+.admin-upload-totalbar {
+  flex: 1 1 100%;
+}
+.admin-upload-total {
+  font-size: 13px;
+  color: dimgray;
+}
+
+/* Theme skin cards (admin skin tab): light base palette. */
+.admin-skin-cards {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 12px;
+  margin-top: 12px;
+}
+.admin-skin-card {
+  flex: 1 1 240px;
+  border: 1px solid #ddd;
+  border-radius: 12px;
+  padding: 16px;
+  background: whitesmoke;
+}
+.admin-skin-card.on {
+  border-color: rgb(57, 144, 155);
+}
+.admin-skin-current {
+  display: inline-block;
+  font-size: 13px;
+  padding: 2px 10px;
+  border-radius: 50px;
+  background: rgba(57, 144, 155, 0.12);
+  color: rgb(45, 115, 124);
 }
 </style>
