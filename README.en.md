@@ -12,6 +12,20 @@ the Worker, so the R2 bucket itself never needs public access.
 > If the button flow does not provision D1 / R2 automatically, use the
 > CLI deployment below.
 
+## Live demo
+
+Demo site: [demo-pan.nesive.com](https://demo-pan.nesive.com)
+
+Demo account (regular user, not an admin):
+
+- Username: `demo`
+- Password: `demo123456`
+
+The demo is isolated from any production data; quotas are 100 MB per
+file, 500 MB per day, 5 GB total, and new uploads expire after 24 hours.
+Do not store anything important on the demo. DAV works with the demo
+account, with write access under the `demo/` directory.
+
 ## Lineage and thanks
 
 This project is a further development of open-source file libraries,
