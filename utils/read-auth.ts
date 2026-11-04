@@ -1,4 +1,4 @@
-// Read-side folder protection + multi-account auth for FlareDrive-R2.
+// Read-side folder protection + multi-account auth for FlarePan.
 //
 // Credential sources, in resolution order for one username:
 //   1. The accounts table in D1 (see below) — only `enabled` rows count.
@@ -1037,7 +1037,7 @@ export function clearSessionCookieHeader() {
 
 export function authRequiredResponse() {
   const headers = new Headers();
-  headers.set('WWW-Authenticate', 'Basic realm="FlareDrive"');
+  headers.set('WWW-Authenticate', 'Basic realm="FlarePan"');
   headers.set('Content-Type', 'application/json');
   return new Response(JSON.stringify({ error: 'login_required' }), {
     status: 401,

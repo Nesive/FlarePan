@@ -1,18 +1,18 @@
 {
   "bugs": {
-    "url": "https://github.com/Nesive/nesive-pan/issues"
+    "url": "https://github.com/Nesive/FlarePan/issues"
   },
   "description": "Self-hosted file library on Cloudflare Workers + R2 + D1: browsing, protected folders, shares, short links, media playback, WebDAV and upload quotas.",
   "devDependencies": {
     "@cloudflare/workers-types": "^5.20261103.1",
     "wrangler": "4.157.0"
   },
-  "homepage": "https://github.com/Nesive/nesive-pan#readme",
+  "homepage": "https://github.com/Nesive/FlarePan#readme",
   "license": "MIT",
-  "name": "pan",
+  "name": "flarepan",
   "repository": {
     "type": "git",
-    "url": "git+https://github.com/Nesive/nesive-pan.git"
+    "url": "git+https://github.com/Nesive/FlarePan.git"
   },
   "scripts": {
     "build": "mkdir -p dist public && wrangler pages functions build functions --outdir dist --output-routes-path dist/_routes.json --compatibility-date 2026-11-03 --project-directory . && cp index.html admin.html 404.html favicon.ico robots.txt public/ && cp -r admin assets public/",

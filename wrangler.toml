@@ -1,11 +1,11 @@
-# Pan — one-click deploy configuration.
+# FlarePan — one-click deploy configuration.
 #
 # Fill in database_id after creating the D1 database (see README.md),
 # or let the Deploy to Cloudflare Workers button provision it.
 # Secrets (SESSION_SECRET, READ_ADMIN_PASS_HASH) are set with
 # `wrangler secret put` and never belong in this file.
 
-name = "pan"
+name = "flarepan"
 compatibility_date = "2026-11-03"
 compatibility_flags = ["nodejs_compat"]
 main = "dist/index.js"
@@ -14,12 +14,12 @@ assets = { binding = "ASSETS", directory = "public" }
 
 [[d1_databases]]
 binding = "DB"
-database_name = "pan"
+database_name = "flarepan"
 database_id = "00000000-0000-0000-0000-000000000000"
 
 [[r2_buckets]]
 binding = "BUCKET"
-bucket_name = "pan"
+bucket_name = "flarepan"
 
 [build]
 command = "npm run build"

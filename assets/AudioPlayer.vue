@@ -245,7 +245,7 @@ export default {
       if (!t) return;
       navigator.mediaSession.metadata = new MediaMetadata({
         title: t.name,
-        artist: 'Nesive网盘',
+        artist: 'FlarePan',
         album: '',
       });
     },

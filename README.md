@@ -1,12 +1,12 @@
-# Pan — Cloudflare 上的自托管文件库
+# FlarePan — Cloudflare 上的自托管文件库
 
 > [English version](./README.en.md)
 
-Pan 是跑在 Cloudflare Workers + R2 + D1 上的自托管文件库：文件夹浏览、
+FlarePan 是跑在 Cloudflare Workers + R2 + D1 上的自托管文件库：文件夹浏览、
 权限控制、提取码分享、短链、音视频播放、WebDAV、上传额度与过期，
 全部经 Worker 鉴权，R2 桶本身不需要开公开访问。
 
-[![Deploy to Cloudflare Workers](https://deploy.workers.cloudflare.com/button)](https://deploy.workers.cloudflare.com/?url=https://github.com/Nesive/nesive-pan)
+[![Deploy to Cloudflare Workers](https://deploy.workers.cloudflare.com/button)](https://deploy.workers.cloudflare.com/?url=https://github.com/Nesive/FlarePan)
 
 > 如果按钮流程没有自动建好 D1 / R2，改走下面的命令行部署。
 
@@ -83,7 +83,7 @@ API（简单 PUT / 分片上传）。
 次数据库迁移（按钮流程不自动跑迁移）：
 
 ```bash
-npx wrangler d1 migrations apply pan --remote
+npx wrangler d1 migrations apply flarepan --remote
 ```
 
 ## 命令行部署
@@ -93,8 +93,8 @@ npx wrangler d1 migrations apply pan --remote
 npx wrangler login
 
 # 2. 建 R2 桶与 D1 库（名字要和 wrangler.toml 里的一致）
-npx wrangler r2 bucket create pan
-npx wrangler d1 create pan
+npx wrangler r2 bucket create flarepan
+npx wrangler d1 create flarepan
 # 把输出的 database_id 填进 wrangler.toml 的 d1_databases 一节
 
 # 3. 设密钥（绝不能写进代码或 wrangler.toml）
@@ -108,7 +108,7 @@ npx wrangler secret put READ_ADMIN_PASS_HASH
 npx wrangler deploy
 
 # 5. 跑数据库迁移
-npx wrangler d1 migrations apply pan --remote
+npx wrangler d1 migrations apply flarepan --remote
 ```
 
 ## 首次登录
@@ -147,7 +147,7 @@ npx wrangler d1 migrations apply pan --remote
 
 ## 数据库迁移
 
-`migrations/` 按顺序跑（`wrangler d1 migrations apply pan --remote`）：
+`migrations/` 按顺序跑（`wrangler d1 migrations apply flarepan --remote`）：
 
 | 迁移 | 内容 |
 | --- | --- |
@@ -178,7 +178,7 @@ npm install
 npm run dev        # wrangler pages dev，R2 + D1 本地绑定
 ```
 
-本地 D1 先跑一次 `npx wrangler d1 migrations apply pan --local`，
+本地 D1 先跑一次 `npx wrangler d1 migrations apply flarepan --local`，
 再起 dev；`wrangler.toml` 缺位时该命令会直接报错找不到配置。
 
 ## 许可

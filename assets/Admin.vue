@@ -2,7 +2,7 @@
   <div class="admin-page">
     <!-- 登录页：整页表单，杜绝遮罩冒泡误关 -->
     <div v-if="view === 'login'" class="admin-login">
-      <h1>网盘管理后台</h1>
+      <h1>FlarePan 管理后台</h1>
       <p class="admin-sub">请登录后管理文件、受保护文件夹、分享、WebDAV、短链、账号与权限。</p>
       <div class="admin-form">
         <label>账号
@@ -29,7 +29,7 @@
     <!-- 控制台 -->
     <div v-else class="admin-console">
       <div class="admin-bar">
-        <h1>网盘管理后台</h1>
+        <h1>FlarePan 管理后台</h1>
         <span v-if="user" class="admin-who">当前账号：{{ user }}</span>
         <button @click="doLogout" class="admin-btn">退出</button>
       </div>

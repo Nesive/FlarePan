@@ -1,13 +1,13 @@
-# Pan — Self-hosted file library on Cloudflare
+# FlarePan — Self-hosted file library on Cloudflare
 
 > [中文版](./README.md)
 
-Pan is a self-hosted file library running on Cloudflare Workers + R2 + D1:
+FlarePan is a self-hosted file library running on Cloudflare Workers + R2 + D1:
 folder browsing, access control, code-protected shares, short links, media
 playback, WebDAV, and upload quotas with expiry — all authorized through
 the Worker, so the R2 bucket itself never needs public access.
 
-[![Deploy to Cloudflare Workers](https://deploy.workers.cloudflare.com/button)](https://deploy.workers.cloudflare.com/?url=https://github.com/Nesive/nesive-pan)
+[![Deploy to Cloudflare Workers](https://deploy.workers.cloudflare.com/button)](https://deploy.workers.cloudflare.com/?url=https://github.com/Nesive/FlarePan)
 
 > If the button flow does not provision D1 / R2 automatically, use the
 > CLI deployment below.
@@ -95,7 +95,7 @@ the Worker, R2 bucket, and D1 database, then set the secrets under
 this once afterwards:
 
 ```bash
-npx wrangler d1 migrations apply pan --remote
+npx wrangler d1 migrations apply flarepan --remote
 ```
 
 ## CLI deployment
@@ -105,8 +105,8 @@ npx wrangler d1 migrations apply pan --remote
 npx wrangler login
 
 # 2. Create the R2 bucket and D1 database (names must match wrangler.toml)
-npx wrangler r2 bucket create pan
-npx wrangler d1 create pan
+npx wrangler r2 bucket create flarepan
+npx wrangler d1 create flarepan
 # Copy the printed database_id into wrangler.toml's d1_databases section
 
 # 3. Set secrets (never put them in code or wrangler.toml)
@@ -120,7 +120,7 @@ npx wrangler secret put READ_ADMIN_PASS_HASH
 npx wrangler deploy
 
 # 5. Apply database migrations
-npx wrangler d1 migrations apply pan --remote
+npx wrangler d1 migrations apply flarepan --remote
 ```
 
 ## First login
@@ -161,7 +161,7 @@ Over-quota error codes: `upload_too_large` (413),
 
 ## Database migrations
 
-`migrations/` apply in order (`wrangler d1 migrations apply pan --remote`):
+`migrations/` apply in order (`wrangler d1 migrations apply flarepan --remote`):
 
 | Migration | Contents |
 | --- | --- |
@@ -194,7 +194,7 @@ npm install
 npm run dev        # wrangler pages dev, local R2 + D1 bindings
 ```
 
-Run `npx wrangler d1 migrations apply pan --local` once before starting
+Run `npx wrangler d1 migrations apply flarepan --local` once before starting
 dev; without a `wrangler.toml` that command fails outright with no
 configuration file found.
 

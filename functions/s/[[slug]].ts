@@ -17,7 +17,7 @@ const FALLBACK_SHELL = `<!DOCTYPE html>
   <head>
     <meta charset="utf-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-    <title>分享 - FlareDrive</title>
+    <title>分享 - FlarePan</title>
     <script src="https://cdn.jsdmirror.com/npm/vue@3.2.37/dist/vue.global.min.js"></script>
     <script src="https://cdn.jsdmirror.com/npm/axios@0.27.2/dist/axios.min.js"></script>
     <script src="https://cdn.jsdmirror.com/npm/vue3-sfc-loader@0.9.5/dist/vue3-sfc-loader.min.js"></script>

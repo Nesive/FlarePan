@@ -102,9 +102,9 @@
         @click.prevent="cwd = ''">
         <img
           src="/assets/homescreen.png"
-          alt="Nesive的网盘"
+          alt="FlarePan"
           style="height: 24px" />
-        <h1 class="app-title" style="font-size: 20px;margin: 0 25px 0 8px; user-select: none;">FlareDrive</h1>
+        <h1 class="app-title" style="font-size: 20px;margin: 0 25px 0 8px; user-select: none;">FlarePan</h1>
       </a>
 
       <input
@@ -475,7 +475,7 @@ export default {
     // 前端版本戳：每次部署同步 bump（见 assets/version.json）。
     // 手机浏览器常把标签页留存数日不刷新，旧代码会让视频继续走新标签页；
     // 已加载的旧页在切回可见时发现版本不一致就自动重载，之后不再有旧代码。
-    appVersion: '20261104-20',
+    appVersion: '20261104-22',
     // 播放器挂在 App 根节点，文件夹切换、前进后退、PDF 浮层都不卸载它。
     playerQueue: [],
     playerStartIndex: 0,
@@ -1045,8 +1045,8 @@ export default {
           window.history.pushState(null, '', url.toString());
         }
         document.title = this.cwd.replace(/.*\/(?!$)|\//g, '') === '/'
-            ? 'Nesive的网盘文件库'
-            :`${this.cwd.replace(/.*\/(?!$)|\//g, '') || '/' } - Nesive网盘文件库`;
+            ? 'FlarePan文件库'
+            :`${this.cwd.replace(/.*\/(?!$)|\//g, '') || '/' } - FlarePan文件库`;
       },
       immediate: true,
     },
