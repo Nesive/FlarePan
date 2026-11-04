@@ -30,11 +30,19 @@ account, with write access under the `demo/` directory.
 
 ![Feature tour](screenshots/showcase-en.gif)
 
-A real feature tour from the live demo: Starship-theme browsing, library search, in-site Markdown viewing, the bottom audio player, the centered video window, and the image lightbox.
+A real feature tour from the live demo: Starship and Original themes, instant skin switching, planet favicon, multi-account and folder-level permissions, WebDAV, the short-link master switch, in-site Markdown viewing, the bottom audio player, the centered video window, and the image lightbox.
 
-![Mobile home](screenshots/front-mobile.png)
+Feature demo video (cut from real screenshots, 94s): [pan-demo.mp4](screenshots/pan-demo.mp4)
 
-Mobile is fully featured too: search, folders, file lists and viewers all work.
+![Mobile Starship](screenshots/front-mobile.png)
+
+![Mobile Original](screenshots/front-mobile-original.png)
+
+Mobile is fully featured too: search, folders, file lists and viewers all work, and both themes switch the same way on phones.
+
+![Tab planet favicon](screenshots/favicon-tab.png)
+
+The favicon follows the skin: a transparent planet icon with no white or square background on the browser tab.
 
 ## Lineage and thanks
 
