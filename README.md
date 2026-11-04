@@ -25,13 +25,13 @@ DAV 可用 demo 账号登录，写权限在 `demo/` 目录下。
 
 ## 截图
 
-以下截图来自演示站（星际航行者皮肤）：
+![功能轮播](screenshots/showcase-zh.gif)
 
-![桌面端首页](screenshots/front-desktop.png)
+上面是演示站的真实功能轮播：星际航行者主题浏览、星图检索、站内 Markdown 查看、音频底部播放器、视频居中大窗、图片灯箱。
 
 ![手机端首页](screenshots/front-mobile.png)
 
-![图片灯箱查看器](screenshots/viewer-image.png)
+手机端同样完整：搜索、文件夹、文件列表与查看器全部可用。
 
 ## 谱系与致谢
 

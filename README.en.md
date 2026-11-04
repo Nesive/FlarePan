@@ -28,13 +28,13 @@ account, with write access under the `demo/` directory.
 
 ## Screenshots
 
-Screenshots from the live demo (Starship skin):
+![Feature tour](screenshots/showcase-en.gif)
 
-![Desktop home](screenshots/front-desktop.png)
+A real feature tour from the live demo: Starship-theme browsing, library search, in-site Markdown viewing, the bottom audio player, the centered video window, and the image lightbox.
 
 ![Mobile home](screenshots/front-mobile.png)
 
-![Image lightbox viewer](screenshots/viewer-image.png)
+Mobile is fully featured too: search, folders, file lists and viewers all work.
 
 ## Lineage and thanks
 
