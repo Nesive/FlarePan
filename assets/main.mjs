@@ -70,18 +70,22 @@ export async function multipartUpload(key, file, options) {
   const uploadId = await axios
     .post(`/api/write/items/${key}?uploads`, '', { headers })
     .then((res) => res.data.uploadId);
-  const totalChunks = Math.ceil(file.size / SIZE_LIMIT);
+  // Chunk size is configurable so callers behind a stricter per-request
+  // ceiling (e.g. Cloudflare's 100 MB edge limit) can stay under it;
+  // the default keeps the existing frontend behavior unchanged.
+  const chunkSize = options?.chunkSize || SIZE_LIMIT;
+  const totalChunks = Math.ceil(file.size / chunkSize);
 
   const promiseGenerator = function* () {
     for (let i = 1; i <= totalChunks; i++) {
-      const chunk = file.slice((i - 1) * SIZE_LIMIT, i * SIZE_LIMIT);
+      const chunk = file.slice((i - 1) * chunkSize, i * chunkSize);
       const searchParams = new URLSearchParams({ partNumber: i, uploadId });
       yield axios
         .put(`/api/write/items/${key}?${searchParams}`, chunk, {
           onUploadProgress(progressEvent) {
             if (typeof options?.onUploadProgress !== 'function') return;
             options.onUploadProgress({
-              loaded: (i - 1) * SIZE_LIMIT + progressEvent.loaded,
+              loaded: (i - 1) * chunkSize + progressEvent.loaded,
               total: file.size,
             });
           },

@@ -285,11 +285,14 @@ export async function onRequest(context) {
   // still gets a working link); the row is simply absent, and a later
   // revoke then leaves that short link for manual cleanup in Sink.
   // Only existing shares are recorded, so stray /s/ targets never
-  // leave orphan mappings behind.
+  // leave orphan mappings behind. targetKind (migration 0006) records
+  // whether the short link points at the plain share URL or a
+  // with-code URL, so the admin management view can tell them apart.
   if (normalized.shareSlug) {
     const shareRow = await getShareRow(db, normalized.shareSlug);
     if (shareRow) {
-      await recordShareShortlink(db, normalized.shareSlug, slug);
+      await recordShareShortlink(db, normalized.shareSlug, slug,
+        normalized.url.includes('?code=') ? 'with_code' : 'plain');
     }
   }
   return json({

@@ -191,6 +191,24 @@ export async function moveLedgerKey(db, oldKey, newKey) {
   ]);
 }
 
+// Folder rename: rewrite every ledger key under oldPrefix to newPrefix.
+// Prefixes end with "/". The range scan (key >= prefix AND key <
+// prefix-with-last-char-bumped) avoids LIKE wildcards in folder names.
+// Destination-range rows are deleted first so the UPDATE can never hit
+// a PRIMARY KEY collision on a stale row.
+export async function moveLedgerPrefix(db, oldPrefix, newPrefix) {
+  if (!db) return;
+  const upper = (prefix) => prefix.slice(0, -1) + '0';
+  await db.batch([
+    db.prepare('DELETE FROM upload_ledger WHERE key >= ? AND key < ?')
+      .bind(newPrefix, upper(newPrefix)),
+    db.prepare(
+      'UPDATE upload_ledger SET key = ? || substr(key, ?) '
+      + 'WHERE key >= ? AND key < ?'
+    ).bind(newPrefix, oldPrefix.length + 1, oldPrefix, upper(oldPrefix)),
+  ]);
+}
+
 export async function reserveMultipart(db, uploadId, key, identity, size, now) {
   if (!db) return;
   await db

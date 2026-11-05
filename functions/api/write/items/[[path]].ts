@@ -1,5 +1,6 @@
 import { get_auth_status } from '@/utils/auth';
 import { notFound, parseBucketPath } from '@/utils/bucket';
+import { requireAdminCookie } from '@/utils/read-auth';
 import {
   checkUpload,
   recordUpload,
@@ -147,12 +148,23 @@ export async function onRequestPutMultipart(context) {
 
 export async function onRequestPut(context) {
   if (!get_auth_status(context)) {
-    const header = new Headers();
-    header.set('WWW-Authenticate','Basic realm="需要登录"');
-    return new Response('没有操作权限', {
-        status: 401,
-        headers: header,
-    });
+    // The admin UI logs in by cookie session, not Basic, so a valid
+    // admin cookie is accepted here too (admins always have write
+    // access). Anything else keeps the original 401 exactly.
+    const db = context.env['DB'] || null;
+    let adminOk = false;
+    if (db) {
+      const gate = await requireAdminCookie(context, db);
+      if (!(gate instanceof Response)) adminOk = true;
+    }
+    if (!adminOk) {
+      const header = new Headers();
+      header.set('WWW-Authenticate','Basic realm="需要登录"');
+      return new Response('没有操作权限', {
+          status: 401,
+          headers: header,
+      });
+    }
   }
   const url = new URL(context.request.url);
 

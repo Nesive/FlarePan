@@ -262,8 +262,11 @@ html[data-skin="starship"] .ctrl-search input[type="search"] {
   border: none;
   background: none;
   padding: 0;
-
-  font-size: 16px;
+  /* 搜索输入字小修复：原 16px 字配 18px 高盒子，行盒（约 24px）被裁，
+     在星际大 pill 里显得更小；原主题盒子 34px 高、字完整。改为 18px 字 +
+     28px 高盒子，行盒完整落入，手机端同样生效（仍 ≥16px，不触发 iOS 聚焦放大）。 */
+  height: 28px;
+  font-size: 18px;
 }
 html[data-skin="starship"] .chart {
   max-width: 1060px;

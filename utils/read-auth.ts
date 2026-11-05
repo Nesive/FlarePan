@@ -549,6 +549,7 @@ export async function getShareRow(db, slug) {
 }
 
 // Public view of a share row: never includes the code hash.
+// lockedUntil is included so the admin list can show the locked state.
 export function publicShareRow(row) {
   return {
     slug: row.slug,
@@ -557,6 +558,7 @@ export function publicShareRow(row) {
     createdAt: row.createdAt,
     expiresAt: row.expiresAt,
     enabled: row.enabled,
+    lockedUntil: row.lockedUntil,
   };
 }
 
@@ -611,17 +613,36 @@ export async function deleteShareRow(db, slug) {
 // and must never fail the shorten itself, and revoking a share must
 // never fail because Sink cleanup failed. A missing table means a
 // pre-0003 database, which by definition holds no mappings.
-export async function recordShareShortlink(db, slug, shortCode) {
+// target_kind (migration 0006) records whether the short link points
+// at the plain share URL ('plain') or a with-code URL ('with_code');
+// rows recorded before 0006 have NULL and are shown as unknown type.
+export async function recordShareShortlink(db, slug, shortCode, targetKind) {
   if (!db) return false;
+  const kind = typeof targetKind === 'string' ? targetKind : null;
   try {
     const res = await db
       .prepare(
-        'INSERT OR IGNORE INTO share_shortlinks (short_code, slug, created_at) VALUES (?, ?, ?)'
+        'INSERT OR IGNORE INTO share_shortlinks (short_code, slug, created_at, target_kind) VALUES (?, ?, ?, ?)'
       )
-      .bind(shortCode, slug, Math.floor(Date.now() / 1000))
+      .bind(shortCode, slug, Math.floor(Date.now() / 1000), kind)
       .run();
     return !!res.success;
-  } catch {
+  } catch (e) {
+    // Pre-0006 database: no target_kind column yet. Retry without it
+    // rather than dropping the mapping entirely.
+    if (e && /no such column/i.test(e.message || '')) {
+      try {
+        const res = await db
+          .prepare(
+            'INSERT OR IGNORE INTO share_shortlinks (short_code, slug, created_at) VALUES (?, ?, ?)'
+          )
+          .bind(shortCode, slug, Math.floor(Date.now() / 1000))
+          .run();
+        return !!res.success;
+      } catch {
+        return false;
+      }
+    }
     return false;
   }
 }
@@ -655,6 +676,101 @@ export async function deleteShareShortlink(db, shortCode) {
   } catch {
     // Best-effort: a stale mapping row is harmless (the share is gone,
     // and a later revoke of the same slug re-reads the same row).
+  }
+}
+
+// Full short-link rows for one share, for the admin shares management
+// view: short code, creation time and target kind (null = recorded
+// before migration 0006, shown as unknown type). Returns null when the
+// mapping cannot be read at all; an empty array when the share simply
+// has no recorded short links (or the table predates 0003).
+export async function listShareShortlinkRows(db, slug) {
+  if (!db) throw new Error('no_db');
+  try {
+    const res = await db
+      .prepare(
+        'SELECT short_code, created_at, target_kind FROM share_shortlinks WHERE slug = ? ORDER BY created_at'
+      )
+      .bind(slug)
+      .all();
+    if (!res.success) return null;
+    return (res.results || []).map((r) => ({
+      shortCode: r.short_code,
+      createdAt: Number(r.created_at) || 0,
+      targetKind: typeof r.target_kind === 'string' ? r.target_kind : null,
+    }));
+  } catch (e) {
+    if (e && /no such column/i.test(e.message || '')) {
+      // Pre-0006 database: fall back to the kind-less shape.
+      try {
+        const res = await db
+          .prepare(
+            'SELECT short_code, created_at FROM share_shortlinks WHERE slug = ? ORDER BY created_at'
+          )
+          .bind(slug)
+          .all();
+        if (!res.success) return null;
+        return (res.results || []).map((r) => ({
+          shortCode: r.short_code,
+          createdAt: Number(r.created_at) || 0,
+          targetKind: null,
+        }));
+      } catch {
+        return null;
+      }
+    }
+    if (e && /no such table/i.test(e.message || '')) return [];
+    return null;
+  }
+}
+
+// One GROUP BY for the shares list enrich: slug -> recorded short-link
+// count. Returns null on any failure, so the list omits counts rather
+// than failing (a per-row query here would be an N+1).
+export async function countShareShortlinks(db) {
+  if (!db) return null;
+  try {
+    const res = await db
+      .prepare(
+        'SELECT slug, COUNT(*) AS c FROM share_shortlinks GROUP BY slug'
+      )
+      .all();
+    if (!res.success) return null;
+    const counts = {};
+    for (const r of res.results || []) {
+      if (typeof r.slug === 'string') counts[r.slug] = Number(r.c) || 0;
+    }
+    return counts;
+  } catch {
+    return null;
+  }
+}
+
+export async function setShareEnabled(db, slug, enabled) {
+  if (!db) throw new Error('no_db');
+  await db
+    .prepare('UPDATE shares SET enabled = ? WHERE slug = ?')
+    .bind(enabled ? 1 : 0, slug)
+    .run();
+}
+
+// Slugs of shares whose expiry has passed (expires_at NULL = permanent
+// and never expires). Used by the purge-expired bulk action.
+export async function listExpiredShareSlugs(db, now) {
+  if (!db) throw new Error('no_db');
+  try {
+    const res = await db
+      .prepare(
+        'SELECT slug FROM shares WHERE expires_at IS NOT NULL AND expires_at <= ? ORDER BY expires_at'
+      )
+      .bind(now)
+      .all();
+    if (!res.success) return null;
+    return (res.results || [])
+      .map((r) => r.slug)
+      .filter((s) => typeof s === 'string');
+  } catch {
+    return null;
   }
 }
 

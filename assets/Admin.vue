@@ -90,6 +90,7 @@
             </div>
             <div class="admin-file-actions">
               <button v-if="shortenEnabled" @click="copyShortLink('/?p=' + encodeURIComponent(f))">复制短链</button>
+              <button @click="renameFolder(f)">改名</button>
             </div>
           </li>
           <li v-for="file in files" :key="file.key" class="admin-file-row">
@@ -279,7 +280,7 @@
       <!-- 分享页 -->
       <section v-if="tab === 'shares'">
         <h2>分享</h2>
-        <p class="admin-desc">给受保护文件夹生成分享链接与提取码，访客不用登录，输对码就能浏览和下载该文件夹。提取码只在创建或重新生成时显示一次，之后任何地方都拿不回原文，丢了只能重新生成。</p>
+        <p class="admin-desc">给受保护文件夹生成分享链接与提取码，访客不用登录，输对码就能浏览和下载该文件夹。提取码只在创建或重新生成时显示一次，之后任何地方都拿不回原文，丢了只能重新生成。带码链接与带码短链也只在生成时显示一次；之后如需新的带码形态，请在列表里重新生成提取码（旧码立即失效）。</p>
         <div v-if="shareError" class="admin-error">{{ shareError }}</div>
         <div v-if="shareOk" class="admin-ok">{{ shareOk }}</div>
         <div v-if="shareWarn" class="admin-warn">{{ shareWarn }}</div>
@@ -315,18 +316,60 @@
             <button v-if="shortenEnabled" @click="copyShareShortLink(shareResult)">复制短链</button>
           </div>
         </div>
+        <div v-if="shares.length" class="admin-row share-filter">
+          <select v-model="shareFilterPrefix">
+            <option value="all">全部文件夹</option>
+            <option v-for="p in shareFilterPrefixes" :key="p" :value="p">{{ p }}</option>
+          </select>
+          <select v-model="shareFilterStatus">
+            <option value="all">全部状态</option>
+            <option value="active">正常</option>
+            <option value="expired">已过期</option>
+            <option value="locked">已锁定</option>
+            <option value="disabled">已停用</option>
+          </select>
+          <button @click="purgeExpiredShares">清理已过期</button>
+        </div>
         <ul class="admin-list">
-          <li v-for="s in shares" :key="s.slug" class="admin-user-row">
+          <li v-for="s in filteredShares" :key="s.slug" class="admin-user-row share-row">
             <span><strong>{{ s.prefix }}</strong></span>
             <span><code>{{ shareLinkOf(s) }}</code></span>
             <span>{{ shareExpiryText(s) }}</span>
+            <span :class="'share-status-pill share-status-' + shareStatus(s)">{{ shareStatusText(s) }}</span>
+            <button @click="toggleShareDetail(s)">{{ shareExpanded[s.slug] ? '收起管理 ▾' : '链接管理 ▸' }}</button>
             <button @click="copyShareLink(s)">复制链接</button>
             <button v-if="shortenEnabled" @click="copyShareShortLink(s)">复制短链</button>
             <button @click="regenerateShare(s)">重新生成提取码</button>
+            <button v-if="s.enabled" @click="setShareEnabled(s, false)">停用</button>
+            <button v-else @click="setShareEnabled(s, true)">启用</button>
             <button @click="deleteShare(s)" class="admin-danger">撤销</button>
+            <div v-if="shareExpanded[s.slug]" class="share-detail">
+              <div class="share-detail-section">
+                <h4>链接</h4>
+                <div>普通链接：<code>{{ shareLinkOf(s) }}</code> <button @click="copyShareLink(s)">复制</button></div>
+                <div class="admin-desc">提取码只显示一次，当前无法重新显示；如需带码链接请重新生成（旧码立即失效）。 <button @click="regenerateAndCopyCodeLink(s)">重新生成并复制带码链接</button></div>
+              </div>
+              <div v-if="shortenEnabled" class="share-detail-section">
+                <h4>短链<span v-if="typeof s.shortlinkCount === 'number'">（{{ s.shortlinkCount }} 条）</span></h4>
+                <div v-if="shareShortlinksLoading[s.slug]">加载中…</div>
+                <div v-else-if="shareShortlinksError[s.slug]" class="admin-error">{{ shareShortlinksError[s.slug] }}</div>
+                <ul v-else-if="shareShortlinksRows(s).length" class="admin-list">
+                  <li v-for="r in shareShortlinksRows(s)" :key="r.shortCode" class="admin-user-row">
+                    <span><code>{{ r.shortLink || r.shortCode }}</code></span>
+                    <span class="share-type-pill">{{ shareShortlinkTypeText(r) }}</span>
+                    <span>{{ shortlinkTimeText(r) }}</span>
+                    <button v-if="r.shortLink" @click="copyShortlinkRow(r)">复制短链</button>
+                    <button @click="deleteShortlinkRow(s, r)" class="admin-danger">删除短链</button>
+                  </li>
+                </ul>
+                <div v-else class="admin-desc">尚未生成短链 <button @click="createPlainShortlink(s)">生成普通短链</button></div>
+              </div>
+              <div v-else class="admin-desc">短链功能已关闭，去“短链”页签开启。</div>
+            </div>
           </li>
         </ul>
-        <div v-if="!shares.length && !shareError" class="admin-empty">暂无分享</div>
+        <div v-if="!shares.length && !shareError" class="admin-empty">暂无分享<br /><span>先在“受保护文件夹”页勾选文件夹，再回来新建分享。</span></div>
+        <div v-else-if="shares.length && !filteredShares.length" class="admin-empty">没有符合条件的分享 <button @click="clearShareFilters">清除筛选</button></div>
       </section>
 
       <!-- WebDAV 页 -->
@@ -623,6 +666,7 @@ pass = &lt;你的密码&gt;</pre>
 
 <script>
 import MimeIcon from './MimeIcon.vue';
+import { multipartUpload } from '/assets/main.mjs';
 
 // 前端文件列表用的文件夹图标原物（App.vue 内联 SVG，viewBox 0 0 576 512），
 // 管理后台文件行与受保护勾选行直接复用同一图形，不再用 emoji 占位。
@@ -725,6 +769,12 @@ export default {
     shareOk: '',
     shareWarn: '',
     shareBusy: false,
+    shareFilterPrefix: 'all',
+    shareFilterStatus: 'all',
+    shareExpanded: {},
+    shareShortlinks: {},
+    shareShortlinksLoading: {},
+    shareShortlinksError: {},
     // 账号
     users: [],
     acctError: '',
@@ -764,6 +814,22 @@ export default {
       .origin + this
       .shareResult
       .shareUrl : '';
+    },
+
+    shareFilterPrefixes() {
+      const seen = {};
+      this.shares.forEach((s) => { seen[s.prefix] = true; });
+      return Object.keys(seen).sort();
+    },
+
+    filteredShares() {
+      return this.shares.filter((s) => {
+        if (this.shareFilterPrefix !== 'all'
+          && s.prefix !== this.shareFilterPrefix) return false;
+        if (this.shareFilterStatus !== 'all'
+          && this.shareStatus(s) !== this.shareFilterStatus) return false;
+        return true;
+      });
     },
 
     hasFailedRows() {
@@ -1079,60 +1145,51 @@ export default {
       this.uploadBatchLoaded = loaded;
     },
 
-    uploadOneFile(row) {
-      return new Promise((resolve) => {
-        const fd = new FormData();
-        fd.append('file', row.file);
-        fd.append('path', this.cwd);
-        const xhr = new XMLHttpRequest();
-        xhr.open('POST', '/api/admin/files/upload', true);
-        xhr.upload.onprogress = (e) => {
-          row.loaded = e.loaded;
-          row.percent = row.size
-            ? Math.min(100, Math.round((e.loaded / row.size) * 100))
-            : 0;
-          this.updateBatchProgress();
-        };
-        xhr.onload = () => {
-          let data = {};
-          try {
-            data = JSON.parse(xhr.responseText);
-          } catch (e) {
-            data = {};
-          }
-          if (xhr.status === 401) {
-            this.uploadLoginExpired = true;
-            this.goLogin('登录已失效，请重新登录');
-            row.status = 'failed';
-            row.error = '登录失效';
-            resolve(false);
-            return;
-          }
-          if (typeof data.existedBefore === 'boolean') {
-            row.existedBefore = data.existedBefore;
-          }
-          if (typeof data.key === 'string') row.key = data.key;
-          if (xhr.status >= 200 && xhr.status < 300) {
-            row.status = 'done';
-            row.loaded = row.size;
-            row.percent = 100;
-            row.error = '';
-            row.note = '';
+    // Admin upload via R2 multipart (same helper as the main frontend):
+    // the old single-POST carried the whole file in one request, which
+    // Cloudflare's edge rejects with 413 once the body exceeds the plan
+    // limit (100 MB on Free/Pro) — long before the configured per-file
+    // cap (500 MB) is ever evaluated. Chunking at 50 MB keeps every
+    // request under that edge ceiling with margin; the server still
+    // enforces the configured per-file/daily/total caps at create and
+    // at complete time, so quota behavior is unchanged.
+    async uploadOneFile(row) {
+      const key = this.cwd + row.file.name;
+      try {
+        await multipartUpload(key, row.file, {
+          chunkSize: 50 * 1000 * 1000,
+          onUploadProgress: (e) => {
+            row.loaded = e.loaded;
+            row.percent = row.size
+              ? Math.min(100, Math.round((e.loaded / row.size) * 100))
+              : 0;
             this.updateBatchProgress();
-            resolve(true);
-            return;
-          }
+          },
+        });
+        row.status = 'done';
+        row.loaded = row.size;
+        row.percent = 100;
+        row.error = '';
+        row.note = '';
+        row.key = key;
+        this.updateBatchProgress();
+        return true;
+      } catch (err) {
+        const status = err && err.response ? err.response.status : 0;
+        const code = err && err.response && err.response.data
+          ? err.response.data.error
+          : '';
+        if (status === 401) {
+          this.uploadLoginExpired = true;
+          this.goLogin('登录已失效，请重新登录');
           row.status = 'failed';
-          row.error = this.uploadErrorText(xhr.status, data.error);
-          resolve(false);
-        };
-        xhr.onerror = () => {
-          row.status = 'failed';
-          row.error = '上传失败，请重试';
-          resolve(false);
-        };
-        xhr.send(fd);
-      });
+          row.error = '登录失效';
+          return false;
+        }
+        row.status = 'failed';
+        row.error = this.uploadErrorText(status, code);
+        return false;
+      }
     },
 
     async autoCleanupRow(row) {
@@ -1301,6 +1358,22 @@ export default {
       if (await this.adminFileAction({ action: 'rename',
       key,
       target: dir + name })) {
+        this.actionOk = '已改名';
+        this.fetchFilesAdmin();
+      }
+    },
+
+    // 文件夹同级改名：只改最后一段，不跨目录移动。f 带尾斜杠
+    // （如 "docs/sub/"），后端 key/target 不带尾斜杠。
+    async renameFolder(prefix) {
+      const name = window.prompt('重命名为：', this.folderDisplayName(prefix));
+      if (!name) return;
+      const folder = prefix.replace(/\/$/, '');
+      const parent = folder.slice(0, folder.length
+        - folder.split('/').pop().length);
+      if (await this.adminFileAction({ action: 'rename-folder',
+      key: folder,
+      target: parent + name })) {
         this.actionOk = '已改名';
         this.fetchFilesAdmin();
       }
@@ -2104,6 +2177,236 @@ export default {
       }
     },
 
+    // ---- 分享链接管理 ----
+    // 状态判定（前端按行字段算）：已过期是终态，优先于已锁定。
+    shareStatus(s) {
+      const now = Math.floor(Date.now() / 1000);
+      if (s.expiresAt && s.expiresAt <= now) return 'expired';
+      if (s.lockedUntil && s.lockedUntil > now) return 'locked';
+      if (!s.enabled) return 'disabled';
+      return 'active';
+    },
+
+    shareStatusText(s) {
+      const texts = {
+        active: '正常',
+        expired: '已过期',
+        locked: '已锁定',
+        disabled: '已停用',
+      };
+      return texts[this.shareStatus(s)] || '正常';
+    },
+
+    shareShortlinkTypeText(r) {
+      if (r.targetKind === 'with_code') return '带码短链';
+      if (r.targetKind === 'plain') return '普通短链';
+      return '未知类型';
+    },
+
+    shortlinkTimeText(r) {
+      if (!r.createdAt) return '';
+      return new Date(r.createdAt * 1000).toLocaleString();
+    },
+
+    shareShortlinksRows(s) {
+      return this.shareShortlinks[s.slug] || [];
+    },
+
+    async toggleShareDetail(s) {
+      const on = !this.shareExpanded[s.slug];
+      this.shareExpanded = Object.assign({}, this.shareExpanded,
+        { [s.slug]: on });
+      if (on && !this.shareShortlinks[s.slug] && this.shortenEnabled) {
+        await this.loadShareShortlinks(s);
+      }
+    },
+
+    async loadShareShortlinks(s) {
+      this.shareShortlinksLoading = Object.assign(
+        {}, this.shareShortlinksLoading, { [s.slug]: true });
+      this.shareShortlinksError = Object.assign(
+        {}, this.shareShortlinksError, { [s.slug]: '' });
+      try {
+        const res = await fetch(
+          `/api/admin/shares/${encodeURIComponent(s.slug)}/shortlinks`);
+        if (res.status === 401) {
+          this.goLogin('登录已失效，请重新登录');
+          return;
+        }
+        const data = await this.readJson(res);
+        if (!res.ok) {
+          this.shareShortlinksError = Object.assign(
+            {}, this.shareShortlinksError, { [s.slug]: '短链加载失败，请重试' });
+          return;
+        }
+        this.shareShortlinks = Object.assign({}, this.shareShortlinks,
+          { [s.slug]: data.shortlinks || [] });
+      } catch (e) {
+        this.shareShortlinksError = Object.assign(
+          {}, this.shareShortlinksError, { [s.slug]: '短链加载失败，请重试' });
+      } finally {
+        this.shareShortlinksLoading = Object.assign(
+          {}, this.shareShortlinksLoading, { [s.slug]: false });
+      }
+    },
+
+    async setShareEnabled(s, enabled) {
+      if (!enabled && !confirm(
+        '停用后该分享链接与提取码立即失效，短链跳转后同样无法访问，确定停用？')) return;
+      this.shareError = '';
+      this.shareOk = '';
+      try {
+        const res = await fetch(
+          `/api/admin/shares/${encodeURIComponent(s.slug)}`, {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ action: enabled ? 'enable' : 'disable' }),
+          });
+        if (res.status === 401) {
+          this.goLogin('登录已失效，请重新登录');
+          return;
+        }
+        const data = await this.readJson(res);
+        if (!res.ok) {
+          this.shareError = enabled ? '启用失败，请重试' : '停用失败，请重试';
+          return;
+        }
+        s.enabled = data.enabled !== false;
+        this.shareOk = enabled ? '已启用' : '已停用';
+      } catch (e) {
+        this.shareError = enabled ? '启用失败，请重试' : '停用失败，请重试';
+      }
+    },
+
+    // 重新生成并直接复制带码链接：与“重新生成提取码”同一接口，
+    // 只是成功后把带码链接写进剪贴板（结果框仍展示新码备查）。
+    async regenerateAndCopyCodeLink(s) {
+      this.shareError = '';
+      this.shareOk = '';
+      this.shareResult = null;
+      try {
+        const res = await fetch(
+          `/api/admin/shares/${encodeURIComponent(s.slug)}`, {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ action: 'regenerate' }),
+          });
+        const data = await this.readJson(res);
+        if (res.status === 401) {
+          this.goLogin('登录已失效，请重新登录');
+          return;
+        }
+        if (!res.ok) {
+          this.shareError = '重新生成失败，请重试';
+          return;
+        }
+        this.shareResult = data;
+        this.shareOk = '新提取码已生成，旧码已失效，请立即复制';
+        const link = window.location.origin + data.shareUrl
+          + '?code=' + encodeURIComponent(data.code);
+        try {
+          await navigator.clipboard.writeText(link);
+          this.shareOk = '带提取码的链接已复制，新码见上方结果框';
+        } catch (e) {
+          window.prompt('带提取码的链接（请手动复制）：', link);
+        }
+        await this.loadShares();
+      } catch (e) {
+        this.shareError = '重新生成失败，请重试';
+      }
+    },
+
+    async createPlainShortlink(s) {
+      await this.copyShareShortLink(s);
+      if (this.shareExpanded[s.slug]) await this.loadShareShortlinks(s);
+    },
+
+    async copyShortlinkRow(r) {
+      if (!r.shortLink) return;
+      try {
+        await navigator.clipboard.writeText(r.shortLink);
+        this.shareOk = '短链已复制：' + r.shortLink;
+      } catch (e) {
+        window.prompt('短链地址（请手动复制）：', r.shortLink);
+      }
+    },
+
+    async deleteShortlinkRow(s, r) {
+      if (!confirm(
+        '删除后该短链立即失效，Sink 没有回收站，无法恢复；分享本身不受影响，确定删除？')) return;
+      this.shareError = '';
+      this.shareOk = '';
+      this.shareWarn = '';
+      try {
+        const res = await fetch(
+          `/api/admin/shares/${encodeURIComponent(s.slug)}/shortlinks/${encodeURIComponent(r.shortCode)}`, {
+            method: 'DELETE',
+          });
+        if (res.status === 401) {
+          this.goLogin('登录已失效，请重新登录');
+          return;
+        }
+        const data = await this.readJson(res);
+        if (!res.ok) {
+          const failures = Array.isArray(data.sinkFailures)
+            ? data.sinkFailures : [];
+          if (failures.length) {
+            this.shareWarn = '短链删除失败，请去 Sink 后台手动删除：'
+              + failures.map((f) => f.shortCode).filter(Boolean).join('、');
+          } else {
+            this.shareError = '删除短链失败，请重试';
+          }
+          return;
+        }
+        this.shareOk = '短链已删除';
+        await this.loadShareShortlinks(s);
+        await this.loadShares();
+      } catch (e) {
+        this.shareError = '删除短链失败，请重试';
+      }
+    },
+
+    async purgeExpiredShares() {
+      if (!confirm(
+        '将删除全部已过期分享及其已记录短链，此操作不可恢复，确定清理？')) return;
+      this.shareError = '';
+      this.shareOk = '';
+      this.shareWarn = '';
+      try {
+        const res = await fetch('/api/admin/shares', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ action: 'purge_expired' }),
+        });
+        if (res.status === 401) {
+          this.goLogin('登录已失效，请重新登录');
+          return;
+        }
+        const data = await this.readJson(res);
+        if (!res.ok) {
+          this.shareError = '清理失败，请重试';
+          return;
+        }
+        this.shareOk = `已清理 ${data.purgedCount || 0} 条过期分享`;
+        const failures = Array.isArray(data.sinkFailures)
+          ? data.sinkFailures : [];
+        if (failures.length) {
+          const codes = failures.map((f) => f.shortCode).filter(Boolean);
+          this.shareWarn = codes.length
+            ? `以下短链未能同步删除，请去 Sink 后台手动删除：${codes.join('、')}`
+            : '短链同步删除失败，请去 Sink 后台核对';
+        }
+        await this.loadShares();
+      } catch (e) {
+        this.shareError = '清理失败，请重试';
+      }
+    },
+
+    clearShareFilters() {
+      this.shareFilterPrefix = 'all';
+      this.shareFilterStatus = 'all';
+    },
+
     async copyShareLink(s) {
       try {
         await navigator.clipboard.writeText(this.shareLinkOf(s));
@@ -2139,6 +2442,8 @@ export default {
         } catch (e) {
           window.prompt('短链地址（请手动复制）：', data.shortLink);
         }
+        // 短链已生成并记入映射；详情区若正展开，刷新短链列表。
+        if (this.shareExpanded[s.slug]) await this.loadShareShortlinks(s);
       } catch (e) {
         this.shareError = '复制短链失败，请重试';
       }
@@ -3144,6 +3449,46 @@ export default {
 .admin-upload-pill-cleaned {
   color: #5b21b6;
   background: rgba(124, 58, 237, 0.10);
+}
+/* 分享管理：行可换行以容纳详情区；状态 pill 与短链类型 pill 沿用
+   admin-upload-pill 的圆角 pill 语言；详情区占整行宽度。 */
+.share-row {
+  flex-wrap: wrap;
+}
+.share-filter {
+  flex-wrap: wrap;
+}
+.share-status-pill,
+.share-type-pill {
+  flex: none;
+  font-size: 13px;
+  padding: 2px 10px;
+  border-radius: 50px;
+  background: whitesmoke;
+}
+.share-status-active {
+  color: #1a7a1a;
+  background: rgba(26, 122, 26, 0.08);
+}
+.share-status-expired,
+.share-status-disabled {
+  color: #666;
+  background: rgba(0, 0, 0, 0.06);
+}
+.share-status-locked {
+  color: #8a5a00;
+  background: rgba(255, 193, 7, 0.18);
+}
+.share-detail {
+  flex-basis: 100%;
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+  padding: 12px 0 4px;
+  border-top: 1px dashed rgba(0, 0, 0, 0.12);
+}
+.share-detail-section h4 {
+  margin: 0 0 8px;
 }
 .admin-progress {
   height: 8px;
