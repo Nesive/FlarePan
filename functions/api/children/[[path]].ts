@@ -1,7 +1,8 @@
 import { notFound, parseBucketPath } from '@/utils/bucket';
+import { isFolderMarker, hasFolderMarkerSegment } from '@/utils/folder-marker';
 import { normalizeVideoContentType } from '@/utils/media-types';
 import {
-  authRequiredResponse,
+  authRequiredResponseNoChallenge,
   canReadPath,
   configCorruptResponse,
   forbiddenResponse,
@@ -38,7 +39,7 @@ export async function onRequestGet(context) {
     const grant = await verifyShareGrant(context, db);
     const listPath = path || '';
     if (isProtectedPath(listPath, config.protected)) {
-      if (!identity && !grant) return authRequiredResponse();
+      if (!identity && !grant) return authRequiredResponseNoChallenge();
       if (
         !canReadPath(listPath, identity, config.protected, rules) &&
         !shareGrantCovers(grant, listPath)
@@ -53,7 +54,10 @@ export async function onRequestGet(context) {
       include: ['httpMetadata', 'customMetadata'],
     });
     const objKeys = objList.objects
-      .filter((obj) => !obj.key.endsWith('/_$folder$'))
+      // Folder markers are storage internals, never user files: hide
+      // them here (and in every other listing) via the shared helper
+      // so a future rename of the convention cannot leak again.
+      .filter((obj) => !isFolderMarker(obj.key))
       // Transcode internals never appear in listings (same as the
       // _$flaredrive$/ system prefix below); they are only served
       // via /transcode/ under the source's protection.
@@ -91,6 +95,9 @@ export async function onRequestGet(context) {
 
     let folders = objList.delimitedPrefixes.filter(
       (folder) =>
+        // A folder named "_$folder$" can only come from an object
+        // stored under a marker path; never show it as a folder.
+        !hasFolderMarkerSegment(folder) &&
         !folder.startsWith('_$transcoded$/') &&
         !folder.startsWith('_$transcode-jobs$/') &&
         (!isProtectedPath(folder, config.protected) ||

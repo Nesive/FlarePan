@@ -38,6 +38,7 @@ const tileClass = computed(() => {
       :height="size"
       alt="Image"
       loading="lazy"
+      decoding="async"
     />
     <svg
       v-else

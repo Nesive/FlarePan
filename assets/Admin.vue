@@ -71,8 +71,11 @@
           <span>当前目录：{{ cwd || "/" }}</span>
         </div>
         <div v-if="filesError" class="admin-error">{{ filesError }}</div>
-        <div v-if="filesLoading">加载中...</div>
-        <ul v-else class="admin-list">
+        <!-- 加载态只在列表为空时占位；有旧列表时保留旧列表、顶部一条
+             细加载条，切文件夹不再整列表闪白。 -->
+        <div v-if="filesLoading && !files.length && !folders.length">加载中...</div>
+        <div v-if="filesLoading && (files.length || folders.length)" class="list-loading-bar"></div>
+        <ul v-if="files.length || folders.length || !filesLoading" class="admin-list">
           <li
             v-if="cwd !== ''"
             class="admin-file-row admin-up-row"
@@ -661,12 +664,33 @@ pass = &lt;你的密码&gt;</pre>
         </div>
       </div>
     </div>
+    <!-- 手动复制兜底框：剪贴板两种写法都失败时用（替代 window.prompt，
+         prompt 在微信等内置浏览器里常被屏蔽、点完无反应）。 -->
+    <div
+      v-if="showManualCopy"
+      class="admin-picker-backdrop"
+      @click.self="closeManualCopy">
+      <div class="admin-picker">
+        <h3>{{ manualCopyTitle }}</h3>
+        <input
+          ref="manualCopyInput"
+          :value="manualCopyText"
+          readonly
+          class="manual-copy-input"
+          @focus="$event.target.select()"
+          @click="$event.target.select()" />
+        <p class="admin-desc">长按 / 右键可手动复制上面整段地址。</p>
+        <div class="admin-row">
+          <button @click="closeManualCopy" class="admin-btn-primary">关闭</button>
+        </div>
+      </div>
+    </div>
   </div>
 </template>
 
 <script>
 import MimeIcon from './MimeIcon.vue';
-import { multipartUpload } from '/assets/main.mjs';
+import { copyTextToClipboard, multipartUpload } from '/assets/main.mjs';
 
 // 前端文件列表用的文件夹图标原物（App.vue 内联 SVG，viewBox 0 0 576 512），
 // 管理后台文件行与受保护勾选行直接复用同一图形，不再用 emoji 占位。
@@ -691,6 +715,8 @@ export default {
     folders: [],
     filesLoading: false,
     filesError: '',
+    // 请求序号 guard：快速连点文件夹时，旧响应后到直接丢弃。
+    adminFetchSeq: 0,
     uploadError: '',
     uploadSummary: '',
     uploadQueue: [],
@@ -768,6 +794,10 @@ export default {
     shareError: '',
     shareOk: '',
     shareWarn: '',
+    // 手动复制兜底框（剪贴板两种写法都失败时用，替代 window.prompt）。
+    showManualCopy: false,
+    manualCopyTitle: '',
+    manualCopyText: '',
     shareBusy: false,
     shareFilterPrefix: 'all',
     shareFilterStatus: 'all',
@@ -1034,6 +1064,13 @@ export default {
       return m ? m[1] : f;
     },
 
+    // 文件夹标记（"_$folder$"）是存储层内部对象：服务端各列表
+    // 已过滤，这里再兜底一道，防服务端回归或缓存旧响应。
+    withoutMarkerKeys(list) {
+      return (list || []).filter((k) =>
+        !String(k || '').split('/').includes('_$folder$'));
+    },
+
     formatDate(t) {
       if (!t) return '—';
       const d = new Date(t);
@@ -1042,24 +1079,34 @@ export default {
 
     // ---- 文件 ----
     async fetchFilesAdmin() {
+      // 请求序号 guard：快速连点文件夹时，旧响应后到直接丢弃。
+      // 不加缓存：上传/改名/移动/删除后每次都重新请求，数据一定新鲜；
+      // 加载时旧列表保留在界面上（见模板），只换新数据。
+      const seq = ++this.adminFetchSeq;
       this.filesLoading = true;
       this.filesError = '';
       try {
         const res = await fetch(`/api/children/${this.cwd}`);
+        if (seq !== this.adminFetchSeq) return;
         if (res.status === 401) {
           this.goLogin('登录已失效，请重新登录');
           return;
         }
         if (!res.ok) throw new Error('http_' + res.status);
         const data = await this.readJson(res);
-        this.files = data.value || [];
-        this.folders = data.folders || [];
+        if (seq !== this.adminFetchSeq) return;
+        // 文件夹标记（"_$folder$"）是存储层内部对象：服务端各列表
+        // 已过滤，这里再兜底一道，防服务端回归或缓存旧响应。
+        this.files = (data.value || []).filter((f) =>
+          !String(f.key || '').split('/').includes('_$folder$'));
+        this.folders = this.withoutMarkerKeys(data.folders);
       } catch (e) {
+        if (seq !== this.adminFetchSeq) return;
         this.files = [];
         this.folders = [];
         this.filesError = '加载失败，请稍后重试';
       } finally {
-        this.filesLoading = false;
+        if (seq === this.adminFetchSeq) this.filesLoading = false;
       }
     },
 
@@ -1418,11 +1465,10 @@ export default {
           this.actionError = data.error ? `复制短链失败：${data.error}` : '复制短链失败，请重试';
           return;
         }
-        try {
-          await navigator.clipboard.writeText(data.shortLink);
+        if (await copyTextToClipboard(data.shortLink)) {
           this.actionOk = '短链已复制：' + data.shortLink;
-        } catch (e) {
-          window.prompt('短链地址（请手动复制）：', data.shortLink);
+        } else {
+          this.openManualCopy('短链地址（请手动复制）：', data.shortLink);
         }
       } catch (e) {
         this.actionError = '复制短链失败，请重试';
@@ -1526,7 +1572,7 @@ export default {
         }
         if (!res.ok) throw new Error('http_' + res.status);
         const data = await this.readJson(res);
-        this.protTopFolders = data.folders || [];
+        this.protTopFolders = this.withoutMarkerKeys(data.folders);
         this.resetProtTree();
       } catch (e) {
         this.protTopFolders = [];
@@ -1590,7 +1636,7 @@ export default {
         }
         if (!res.ok) throw new Error('http_' + res.status);
         const data = await this.readJson(res);
-        const children = data.folders || [];
+        const children = this.withoutMarkerKeys(data.folders);
         this.protTreeChildren[prefix] = children;
         this.protTreeExpanded[prefix] = true;
         this.insertTreeChildren(row, children);
@@ -1770,7 +1816,7 @@ export default {
         }
         if (!res.ok) throw new Error('http_' + res.status);
         const data = await this.readJson(res);
-        const children = data.folders || [];
+        const children = this.withoutMarkerKeys(data.folders);
         this.pickerChildren[prefix] = children;
         this.pickerExpanded[prefix] = true;
         this.insertPickerChildren(row, children);
@@ -1871,13 +1917,36 @@ export default {
       }
     },
 
+    // 手动复制兜底框：剪贴板两种写法都失败时用（替代 window.prompt，
+    // prompt 在微信等内置浏览器里常被屏蔽、点完无反应）。
+    openManualCopy(title, text) {
+      this.manualCopyTitle = title;
+      this.manualCopyText = text;
+      this.showManualCopy = true;
+      this.$nextTick(() => {
+        const el = this.$refs.manualCopyInput;
+        if (el) {
+          el.focus();
+          el.select();
+          try {
+            el.setSelectionRange(0, text.length);
+          } catch (e) {}
+        }
+      });
+    },
+
+    closeManualCopy() {
+      this.showManualCopy = false;
+      this.manualCopyTitle = '';
+      this.manualCopyText = '';
+    },
+
     async copyDavAddr() {
       this.davCopyOk = '';
-      try {
-        await navigator.clipboard.writeText(this.davAddr);
+      if (await copyTextToClipboard(this.davAddr)) {
         this.davCopyOk = '已复制';
-      } catch (e) {
-        window.prompt('WebDAV 地址（请手动复制）：', this.davAddr);
+      } else {
+        this.openManualCopy('WebDAV 地址（请手动复制）：', this.davAddr);
       }
     },
 
@@ -2304,11 +2373,10 @@ export default {
         this.shareOk = '新提取码已生成，旧码已失效，请立即复制';
         const link = window.location.origin + data.shareUrl
           + '?code=' + encodeURIComponent(data.code);
-        try {
-          await navigator.clipboard.writeText(link);
+        if (await copyTextToClipboard(link)) {
           this.shareOk = '带提取码的链接已复制，新码见上方结果框';
-        } catch (e) {
-          window.prompt('带提取码的链接（请手动复制）：', link);
+        } else {
+          this.openManualCopy('带提取码的链接（请手动复制）：', link);
         }
         await this.loadShares();
       } catch (e) {
@@ -2323,11 +2391,10 @@ export default {
 
     async copyShortlinkRow(r) {
       if (!r.shortLink) return;
-      try {
-        await navigator.clipboard.writeText(r.shortLink);
+      if (await copyTextToClipboard(r.shortLink)) {
         this.shareOk = '短链已复制：' + r.shortLink;
-      } catch (e) {
-        window.prompt('短链地址（请手动复制）：', r.shortLink);
+      } else {
+        this.openManualCopy('短链地址（请手动复制）：', r.shortLink);
       }
     },
 
@@ -2408,11 +2475,10 @@ export default {
     },
 
     async copyShareLink(s) {
-      try {
-        await navigator.clipboard.writeText(this.shareLinkOf(s));
+      if (await copyTextToClipboard(this.shareLinkOf(s))) {
         this.shareOk = '链接已复制';
-      } catch (e) {
-        this.shareError = '复制失败，请手动复制链接';
+      } else {
+        this.openManualCopy('链接地址（请手动复制）：', this.shareLinkOf(s));
       }
     },
 
@@ -2436,11 +2502,10 @@ export default {
             : (data.error ? `复制短链失败：${data.error}` : '复制短链失败，请重试');
           return;
         }
-        try {
-          await navigator.clipboard.writeText(data.shortLink);
+        if (await copyTextToClipboard(data.shortLink)) {
           this.shareOk = '短链已复制：' + data.shortLink;
-        } catch (e) {
-          window.prompt('短链地址（请手动复制）：', data.shortLink);
+        } else {
+          this.openManualCopy('短链地址（请手动复制）：', data.shortLink);
         }
         // 短链已生成并记入映射；详情区若正展开，刷新短链列表。
         if (this.shareExpanded[s.slug]) await this.loadShareShortlinks(s);
@@ -2451,13 +2516,11 @@ export default {
 
     async copyShareResult() {
       if (!this.shareResult) return;
-      try {
-        await navigator.clipboard.writeText(
-          `链接：${this.shareResultLink}\n提取码：${this.shareResult.code}`
-        );
+      const text = `链接：${this.shareResultLink}\n提取码：${this.shareResult.code}`;
+      if (await copyTextToClipboard(text)) {
         this.shareOk = '链接与提取码已复制';
-      } catch (e) {
-        this.shareError = '复制失败，请手动复制';
+      } else {
+        this.openManualCopy('链接与提取码（请手动复制）：', text);
       }
     },
 
@@ -2467,11 +2530,10 @@ export default {
       if (!this.shareResult) return;
       const link = this
       .shareResultLink + '?code=' + encodeURIComponent(this.shareResult.code);
-      try {
-        await navigator.clipboard.writeText(link);
+      if (await copyTextToClipboard(link)) {
         this.shareOk = '带提取码的链接已复制';
-      } catch (e) {
-        window.prompt('带提取码的链接（请手动复制）：', link);
+      } else {
+        this.openManualCopy('带提取码的链接（请手动复制）：', link);
       }
     },
 
@@ -2501,11 +2563,10 @@ export default {
             : (data.error ? `复制失败：${data.error}` : '复制失败，请重试');
           return;
         }
-        try {
-          await navigator.clipboard.writeText(data.shortLink);
+        if (await copyTextToClipboard(data.shortLink)) {
           this.shareOk = '带提取码的短链已复制：' + data.shortLink;
-        } catch (e) {
-          window.prompt('带提取码的短链（请手动复制）：', data.shortLink);
+        } else {
+          this.openManualCopy('带提取码的短链（请手动复制）：', data.shortLink);
         }
       } catch (e) {
         this.shareError = '复制失败，请重试';
@@ -3372,6 +3433,19 @@ export default {
   max-height: 80vh;
   overflow-y: auto;
   box-sizing: border-box;
+}
+
+/* 手动复制兜底框里的只读输入框：整段地址可点选/长按复制。 */
+.manual-copy-input {
+  width: 100%;
+  box-sizing: border-box;
+  margin-top: 10px;
+  padding: 10px 12px;
+  font-size: 14px;
+  color: #222;
+  background: #f6f6f6;
+  border: 1px solid #ddd;
+  border-radius: 8px;
 }
 .admin-picker h3 {
   margin: 0 0 12px;

@@ -1,6 +1,7 @@
 <template>
   <AdminView v-if="isAdminPage" />
   <div v-else class="main"
+      ref="mainScroll"
       @dragenter.prevent
       @dragover.prevent
       :style="{ backgroundImage: isStarship ? undefined : `url('${backgroundImageUrl}')`, paddingBottom: playerQueue.length ? '76px' : '' }"
@@ -197,7 +198,9 @@
     </div>
     <div
       v-if="!shareMode || shareState === 'ready'"
-      class="file-list-container">
+      class="file-list-container"
+      ref="listWrap">
+      <div v-if="navLoading" class="list-loading-bar"></div>
       <ul class="file-list">
         <li v-if="cwd !== '' && (!shareMode || cwd !== shareRoot)">
           <div
@@ -308,6 +311,7 @@
     </div>
     <div v-else-if="loadError === 'forbidden' && (!shareMode || shareState === 'ready')" class="voyager-state" style="margin: 20px 0; text-align: center">
       <span style="font-size: 20px;">该文件夹无权访问</span>
+      <div style="margin-top: 10px;"><button @click="openLoginModal(() => fetchFiles())" class="voyager-retry" style="padding: 8px 20px;">登录后查看</button></div>
     </div>
     <div
       v-else-if="loadError && (!shareMode || shareState === 'ready')"
@@ -342,10 +346,10 @@
       </ul>
       <ul v-else class="contextmenu-list">
         <li>
-          <!-- 注意：不要加 target="_blank"：iOS 会忽略 download 并在新标签页打开文件。 -->
-          <a :href="`/raw/${focusedItem.key}`" download>
+          <!-- 预检后再下载：受保护文件未登录时弹站内登录框，而不是浏览器原生框。 -->
+          <button @click="downloadFile(focusedItem)">
             <span>下载</span>
-          </a>
+          </button>
         </li>
         <li>
           <button @click="copyLink(`/raw/${focusedItem.key}`)">
@@ -358,6 +362,25 @@
           </button>
         </li>
       </ul>
+    </Dialog>
+    <div v-if="toastText" class="pan-toast">{{ toastText }}</div>
+    <Dialog :model-value="showManualCopy" @update:model-value="($event) => { if (!$event) closeManualCopy(); }">
+      <div style="padding: 6px 4px 2px; font-size: 15px; font-weight: 600;">
+        {{ manualCopyTitle }}
+      </div>
+      <input
+        ref="manualCopyInput"
+        :value="manualCopyText"
+        readonly
+        class="manual-copy-input"
+        @focus="$event.target.select()"
+        @click="$event.target.select()" />
+      <div style="margin-top: 12px; text-align: right;">
+        <button @click="closeManualCopy" class="voyager-retry" style="padding: 8px 20px;">关闭</button>
+      </div>
+      <div style="margin-top: 8px; font-size: 12px; color: #888;">
+        长按 / 右键可手动复制上面整段地址。
+      </div>
     </Dialog>
     <div style="flex:1"></div>
     <div v-if="isStarship" class="orbit">
@@ -419,12 +442,44 @@
         </div>
       </div>
     </Dialog>
+    <Dialog :model-value="showLogin" @update:model-value="onLoginDialogToggle" class="login-dialog">
+      <form class="login-modal" @submit.prevent="submitLogin">
+        <div class="login-modal-title">管理员登录</div>
+        <div class="login-modal-sub">该内容需要登录后查看</div>
+        <label class="login-field">
+          <span>账号</span>
+          <input
+            ref="loginUserInput"
+            v-model="loginUser"
+            type="text"
+            placeholder="请输入管理员账号"
+            autocomplete="username"
+            :disabled="loginBusy" />
+        </label>
+        <label class="login-field">
+          <span>密码</span>
+          <input
+            v-model="loginPass"
+            type="password"
+            placeholder="请输入密码"
+            autocomplete="current-password"
+            :disabled="loginBusy" />
+        </label>
+        <div v-if="loginError" class="login-modal-error">{{ loginError }}</div>
+        <button type="submit" class="login-modal-primary" :disabled="loginBusy">
+          {{ loginBusy ? '登录中…' : '登录' }}
+        </button>
+        <button type="button" class="login-modal-cancel" @click="closeLogin" :disabled="loginBusy">取消</button>
+        <div class="login-modal-hint">没有账号？请使用分享链接并输入提取码进入。</div>
+      </form>
+    </Dialog>
   </div>
 </template>
 
 <script>
 import {
   blobDigest,
+  copyTextToClipboard,
   generateThumbnail,
   multipartUpload,
   SIZE_LIMIT,
@@ -448,6 +503,11 @@ function normalizeCwd(p) {
   return (p || '').replace(/\/+$/, '');
 }
 
+// 文件夹缓存有效期：60 秒内 revisits 零请求、瞬时渲染；过期命中先
+// 渲染旧数据、后台静默刷新（App 内没有任何写列表的操作，缓存不会
+// 被本站写脏；后台页上传后由后台页自己刷新，前台 60 秒后自然更新）。
+const FOLDER_CACHE_TTL_MS = 60 * 1000;
+
 export default {
   data: () => ({
     cwd: normalizeCwd(new URL(window.location).searchParams.get('p') || ''),
@@ -460,6 +520,25 @@ export default {
     showContextMenu: false,
     showMenu: false,
     copiedItem: null,
+    // 文件夹缓存：cwd → { files, folders, at }（见 FOLDER_CACHE_TTL_MS）。
+    // 命中直接渲染、零请求；过期命中先渲染旧数据、后台静默刷新。
+    // 分享模式不用缓存（授权可能过期，始终请求）。
+    folderCache: {},
+    // 请求序号 guard：快速连点文件夹时，旧请求后到直接丢弃，不覆盖
+    // 新文件夹内容。后台静默刷新同样占一个序号。
+    fetchSeq: 0,
+    // 导航加载态：有旧列表时保留旧列表、只在顶部显示细加载条；
+    // 首次加载（无旧内容）才显示“加载中...”（loading）。
+    navLoading: false,
+    // 首次挂载的 immediate watcher 不回顶（页面本来就在顶部）。
+    // 注意：data 里以下划线开头的键不会被代理到实例上，所以不用 _ 前缀。
+    cwdFirstRun: true,
+    // 复制反馈：toast 文案（2.5 秒自动消失）与手动复制兜底框。
+    toastText: '',
+    toastTimer: null,
+    showManualCopy: false,
+    manualCopyTitle: '',
+    manualCopyText: '',
     loadError: '',
     // 分享模式：/s/<slug> 或 ?s=<slug> 进入；未验码前不拉任何文件列表。
     shareSlug: (() => {
@@ -475,12 +554,22 @@ export default {
     // 前端版本戳：每次部署同步 bump（见 assets/version.json）。
     // 手机浏览器常把标签页留存数日不刷新，旧代码会让视频继续走新标签页；
     // 已加载的旧页在切回可见时发现版本不一致就自动重载，之后不再有旧代码。
-    appVersion: '20261105-02', // 注意：与 assets/version.json 的 version 必须同步改，两处不一致时前台挂载即循环 reload（2026-11-04 -21 教训）
+    appVersion: '20261110-02', // 注意：与 assets/version.json 的 version 必须同步改，两处不一致时前台挂载即循环 reload（2026-11-04 -21 教训）
     // 播放器挂在 App 根节点，文件夹切换、前进后退、PDF 浮层都不卸载它。
     playerQueue: [],
     playerStartIndex: 0,
     pendingAudio: null,
     showAudioPrompt: false,
+    // 站内管理员登录弹窗：权限不够时替代浏览器原生 Basic Auth 框。
+    // loginPending：登录成功后继续的操作；loginNext：直接打开受保护
+    // 文件被带回站内时的回跳地址（二者有其一，loginNext 优先）。
+    showLogin: false,
+    loginUser: '',
+    loginPass: '',
+    loginError: '',
+    loginBusy: false,
+    loginPending: null,
+    loginNext: '',
     // 站内视频播放：默认居中大窗，可切右下角小窗；不压历史，不碰音频条以外的状态。
     videoUrl: '',
     videoName: '',
@@ -535,7 +624,12 @@ export default {
     },
 
     filteredFiles() {
-      let files = this.files;
+      // 文件夹标记（"_$folder$"）是存储层内部对象，绝不是用户
+      // 文件：服务端各列表已过滤，这里再兜底一道，防服务端回归
+      // 或缓存的旧响应把它当文件行渲染出来。
+      let files = this.files.filter((file) =>
+        !file.key.split('/').includes('_$folder$')
+      );
       if (this.search) {
         files = files.filter((file) =>
           file.key.split('/').pop().includes(this.search)
@@ -545,7 +639,9 @@ export default {
     },
 
     filteredFolders() {
-      let folders = this.folders;
+      let folders = this.folders.filter((folder) =>
+        !folder.split('/').includes('_$folder$')
+      );
       if (this.search) {
         folders = folders.filter((folder) => folder.includes(this.search));
       }
@@ -590,9 +686,64 @@ export default {
       document.head.appendChild(link);
     },
 
-    copyLink(link) {
-      const url = new URL(link, window.location.origin);
-      navigator.clipboard.writeText(url.toString());
+    // 复制成功后的行内 ✓ 标记：2 秒后清除（与 toast 互补）。
+    markCopied(itemKey) {
+      if (!itemKey) return;
+      this.copiedItem = itemKey;
+      setTimeout(() => {
+        if (this.copiedItem === itemKey) this.copiedItem = null;
+      }, 2000);
+    },
+
+    // 底部 toast：任何复制结果都必须有可见反馈，不能静默。
+    showToast(text) {
+      this.toastText = text;
+      if (this.toastTimer) clearTimeout(this.toastTimer);
+      this.toastTimer = setTimeout(() => {
+        this.toastText = '';
+        this.toastTimer = null;
+      }, 2500);
+    },
+
+    // 手动复制兜底框：剪贴板两种写法都失败时用（替代 window.prompt，
+    // prompt 在微信等内置浏览器里常被屏蔽、点完无反应）。
+    openManualCopy(title, text) {
+      this.manualCopyTitle = title;
+      this.manualCopyText = text;
+      this.showManualCopy = true;
+      this.$nextTick(() => {
+        const el = this.$refs.manualCopyInput;
+        if (el) {
+          el.focus();
+          el.select();
+          try {
+            el.setSelectionRange(0, text.length);
+          } catch (e) {}
+        }
+      });
+    },
+
+    closeManualCopy() {
+      this.showManualCopy = false;
+      this.manualCopyTitle = '';
+      this.manualCopyText = '';
+    },
+
+    async copyLink(link) {
+      this.showContextMenu = false;
+      const url = new URL(link, window.location.origin).toString();
+      const ok = await copyTextToClipboard(url);
+      if (ok) {
+        // 行内 ✓：按当前聚焦项换算（菜单里点的是它）。
+        const key = typeof this.focusedItem === 'string'
+          ? 'folder:' + this.focusedItem
+          : (this.focusedItem && this.focusedItem.key
+            ? 'file:' + this.focusedItem.key : null);
+        this.markCopied(key);
+        this.showToast('链接已复制');
+      } else {
+        this.openManualCopy('链接地址（请手动复制）：', url);
+      }
     },
 
     async copyShortLink(target, itemKey) {
@@ -607,25 +758,131 @@ export default {
         const data = await res.json().catch(() => ({}));
         if (!res.ok) {
           if (res.status === 401) {
-            alert('复制短链失败：无权访问');
+            // 无权访问：弹站内登录框，登录成功后重试本次复制。
+            this.openLoginModal(() => this.copyShortLink(target, itemKey));
             return;
           }
           alert(data.error ? `复制短链失败：${data.error}` : '复制短链失败');
           return;
         }
         const shortLink = data.shortLink;
-        try {
-          await navigator.clipboard.writeText(shortLink);
-          this.copiedItem = itemKey;
-          setTimeout(() => {
-            if (this.copiedItem === itemKey) this.copiedItem = null;
-          }, 2000);
-        } catch (e) {
-          window.prompt('短链地址（请手动复制）：', shortLink);
+        // 注意：写剪贴板发生在 await fetch 之后，用户手势可能已失效
+        //（iOS Safari 与内置浏览器常见），助手内部先试 Clipboard
+        // API 再试 execCommand，都失败才弹手动复制框。
+        const ok = await copyTextToClipboard(shortLink);
+        if (ok) {
+          this.markCopied(itemKey);
+          this.showToast('短链已复制');
+        } else {
+          this.openManualCopy('短链地址（请手动复制）：', shortLink);
         }
       } catch (e) {
         alert('复制短链失败');
       }
+    },
+
+    // 站内管理员登录：替代浏览器原生 Basic Auth 框。pending 是登录
+    // 成功后继续的回调；直接打开受保护文件被带回站内时（?login=1）
+    // 用 loginNext 回跳原文件，优先于 pending。
+    openLoginModal(pending) {
+      this.loginPending = typeof pending === 'function' ? pending : null;
+      this.loginError = '';
+      this.showLogin = true;
+      this.$nextTick(() => {
+        const el = this.$refs.loginUserInput;
+        if (el) el.focus();
+      });
+    },
+
+    onLoginDialogToggle(v) {
+      if (!v) this.closeLogin();
+      else this.showLogin = true;
+    },
+
+    closeLogin() {
+      this.showLogin = false;
+      this.loginPending = null;
+      this.loginNext = '';
+      this.loginError = '';
+      this.loginBusy = false;
+      // 登录跳转参数只用一次：取消后从地址栏去掉，刷新不再自动弹框。
+      const url = new URL(window.location);
+      if (url.searchParams.has('login')) {
+        url.searchParams.delete('login');
+        url.searchParams.delete('next');
+        window.history.replaceState(null, '', url.toString());
+      }
+    },
+
+    async submitLogin() {
+      if (this.loginBusy) return;
+      if (!this.loginUser || !this.loginPass) {
+        this.loginError = '请输入账号和密码';
+        return;
+      }
+      this.loginBusy = true;
+      this.loginError = '';
+      try {
+        const res = await fetch('/api/auth/login', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            username: this.loginUser,
+            password: this.loginPass,
+          }),
+        });
+        const data = await res.json().catch(() => ({}));
+        if (!res.ok) {
+          // 服务端原话（如“账号或密码错误”），可重试。
+          this.loginError = (data && data.error) || '登录失败，请重试';
+          return;
+        }
+        this.loginPass = '';
+        const pending = this.loginPending;
+        const next = this.loginNext;
+        this.closeLogin();
+        if (next) {
+          window.location.href = next;
+          return;
+        }
+        if (pending) pending();
+      } catch (e) {
+        this.loginError = '登录失败，请重试';
+      } finally {
+        this.loginBusy = false;
+      }
+    },
+
+    // 打开预览 / 下载前预检：HEAD /raw/<key>，401 才弹登录框；其他
+    // 状态按原流程继续（403 等由预览组件自己报错，与今天一致）。
+    async precheckRaw(key) {
+      try {
+        const url = '/raw/' + key.split('/').map(encodeURIComponent).join('/');
+        const res = await fetch(url, { method: 'HEAD' });
+        return res.status;
+      } catch (e) {
+        return 0;
+      }
+    },
+
+    async downloadFile(item) {
+      // 右键菜单下载：先预检，401 弹登录框、登录成功后继续下载；
+      // 已登录或公开文件直接触发浏览器下载（保留 download 行为，
+      // 不加 target="_blank"：iOS 会忽略 download 并新标签页打开）。
+      this.showContextMenu = false;
+      const key = item && typeof item === 'object' ? item.key : null;
+      if (!key) return;
+      const st = await this.precheckRaw(key);
+      if (st === 401) {
+        this.openLoginModal(() => this.downloadFile(item));
+        return;
+      }
+      const a = document.createElement('a');
+      a.href = '/raw/' + key.split('/').map(encodeURIComponent).join('/');
+      a.download = '';
+      document.body.appendChild(a);
+      a.click();
+      a.remove();
     },
 
 
@@ -717,16 +974,50 @@ export default {
       }
     },
 
+    // 列表切换淡入：class 去掉 → 强制 reflow → 加回，动画重播一次。
+    // 只在文件夹导航渲染后调用（搜索/排序不走 fetchFiles，不误触发）。
+    animateList() {
+      this.$nextTick(() => {
+        const el = this.$refs.listWrap;
+        if (!el) return;
+        el.classList.remove('list-in');
+        void el.offsetWidth;
+        el.classList.add('list-in');
+      });
+    },
+
     fetchFiles() {
       if (this.isAdminPage) return;
       // 分享模式未验码前绝不拉列表（首屏 immediate watcher 也一样）。
       if (this.shareMode && this.shareState !== 'ready') return;
-      this.files = [];
-      this.folders = [];
-      this.loading = true;
+      const cwd = normalizeCwd(this.cwd);
+      // 命中缓存：直接渲染，零请求、零闪白；过期命中先渲染旧数据、
+      // 后台静默刷新（刷新到的数据仍以请求序号 guard 为准）。
+      if (!this.shareMode) {
+        const hit = this.folderCache[cwd];
+        if (hit) {
+          this.files = hit.files.slice();
+          this.folders = hit.folders.slice();
+          this.loading = false;
+          this.loadError = '';
+          this.navLoading = false;
+          this.animateList();
+          if (Date.now() - hit.at < FOLDER_CACHE_TTL_MS) return;
+          this.refreshFolderInBackground(cwd);
+          return;
+        }
+      }
+      // 无缓存：有旧列表时保留旧列表 + 顶部细加载条，不闪白；
+      // 首次加载（无旧内容）才显示“加载中...”。
+      const hasOld = this.files.length > 0 || this.folders.length > 0;
+      this.loading = !hasOld;
+      this.navLoading = hasOld;
       this.loadError = '';
-      fetch(`/api/children/${normalizeCwd(this.cwd)}`)
+      const seq = ++this.fetchSeq;
+      fetch(`/api/children/${cwd}`)
         .then(async (res) => {
+          // 旧请求后到：连 401/错误态也不碰，避免污染新文件夹。
+          if (seq !== this.fetchSeq) return null;
           if (res.status === 401) {
             // 分享授权失效：回输码框，不显示“无权访问”。
             if (this.shareMode) {
@@ -735,10 +1026,12 @@ export default {
               sessionStorage.removeItem('share:' + this.shareSlug);
               this.loadError = '';
               this.loading = false;
+              this.navLoading = false;
               return null;
             }
             this.loadError = 'forbidden';
             this.loading = false;
+            this.navLoading = false;
             return null;
           }
           if (!res.ok) {
@@ -753,7 +1046,7 @@ export default {
           return data;
         })
         .then((files) => {
-          if (!files) return;
+          if (seq !== this.fetchSeq || !files) return;
           this.files = files.value || [];
           if (this.order) {
             this.files.sort((a, b) => {
@@ -763,14 +1056,45 @@ export default {
             });
           }
           this.folders = files.folders || [];
+          if (!this.shareMode) {
+            // 存一份拷贝：排序等原地操作只动当前视图，不动缓存。
+            this.folderCache[cwd] = {
+              files: this.files.slice(),
+              folders: this.folders.slice(),
+              at: Date.now(),
+            };
+          }
           this.loading = false;
+          this.navLoading = false;
+          this.animateList();
         })
         .catch(() => {
+          if (seq !== this.fetchSeq) return;
           this.files = [];
           this.folders = [];
           this.loadError = 'failed';
           this.loading = false;
+          this.navLoading = false;
         });
+    },
+
+    // 后台静默刷新：只更新缓存与当前仍在看的这个文件夹，不闪、不报错。
+    refreshFolderInBackground(cwd) {
+      const seq = ++this.fetchSeq;
+      fetch(`/api/children/${cwd}`)
+        .then((res) => (res.ok ? res.json() : null))
+        .then((data) => {
+          if (seq !== this.fetchSeq || !data) return;
+          const files = (data.value || []).filter((file) =>
+            !file.key.split('/').includes('_$folder$'));
+          const folders = data.folders || [];
+          this.folderCache[cwd] = { files, folders, at: Date.now() };
+          if (normalizeCwd(this.cwd) === cwd) {
+            this.files = files;
+            this.folders = folders;
+          }
+        })
+        .catch(() => {});
     },
 
     formatSize(size) {
@@ -860,7 +1184,19 @@ export default {
       return /\.(txt|md|markdown|json|json5|csv|tsv|log|xml|html|htm|css|js|mjs|cjs|ts|jsx|tsx|py|rb|go|rs|java|c|h|cpp|hpp|cc|cs|php|sh|bash|zsh|yml|yaml|toml|ini|conf|cfg|env|sql|diff|patch|tex|rst|adoc|text|srt|vtt)$/i.test(file.key);
     },
 
-    openFile(file) {
+    async openFile(file) {
+      const st = await this.precheckRaw(file.key);
+      if (st === 401) {
+        // 分享授权失效：回输码框（与列表页 401 同款处理），不弹账号登录框。
+        if (this.shareMode) {
+          this.shareState = 'code';
+          this.shareRoot = '';
+          sessionStorage.removeItem('share:' + this.shareSlug);
+          return;
+        }
+        this.openLoginModal(() => this.openFile(file));
+        return;
+      }
       if (this.isVideoFile(file)) {
         this.openVideo(file);
         return;
@@ -1035,6 +1371,12 @@ export default {
       handler() {
         if (this.isAdminPage) return;
         this.fetchFiles();
+        // 进文件夹后回到顶部（首次挂载除外）；后退/前进同样回顶。
+        if (!this.cwdFirstRun) {
+          const scroller = this.$refs.mainScroll;
+          if (scroller) scroller.scrollTo({ top: 0 });
+        }
+        this.cwdFirstRun = false;
         // 分享模式不写 ?p=：地址栏保持 /s/<slug>，前缀不进 URL。
         if (this.shareMode) return;
         const url = new URL(window.location);
@@ -1106,6 +1448,20 @@ export default {
     });
   },
 
+  mounted() {
+    // 直接打开受保护文件被带回站内时（?login=1&next=/raw/...）：
+    // 弹登录框，登录成功后跳回原文件；取消则去掉参数、不再自动弹。
+    // next 只接受站内相对路径（防跳到外站）。
+    if (this.shareMode) return;
+    const params = new URL(window.location).searchParams;
+    if (params.get('login') !== '1') return;
+    const next = params.get('next') || '';
+    if (next.startsWith('/') && !next.startsWith('//')) {
+      this.loginNext = next;
+    }
+    this.openLoginModal(null);
+  },
+
   unmounted() {
     if (this._onVisibilityChange) {
       document.removeEventListener('visibilitychange', this._onVisibilityChange);
@@ -1132,11 +1488,15 @@ export default {
 .main {
   display: flex;
   height: 100%;
+  /* 背景图平均色：图未到之前不白，与图衔接自然。 */
+  background-color: #b2bdbe;
   /* background-image: url(/assets/bg-light.webp); */
   background-size: cover;
   background-position: center;
   overflow-y: auto;
   flex-direction: column;
+  /* 音频条出现/消失时 padding 渐变，内容不跳。 */
+  transition: padding-bottom 0.25s ease;
 }
 
 .app-bar {
@@ -1345,5 +1705,151 @@ export default {
   background: rgb(57, 144, 155);
   color: #fff;
   border-color: rgb(57, 144, 155);
+}
+
+/* 管理员登录弹窗：与分享输码区同款半透明面板 + 青色点缀。
+   容器本身由 Dialog 提供（浅色白底）；星空主题下的容器与本块
+   各元素的深色形态见 assets/skin-starship.css。 */
+.login-modal {
+  padding: 12px 16px 16px;
+  width: 340px;
+  max-width: calc(100vw - 48px);
+  text-align: center;
+}
+
+.login-modal-title {
+  font-size: 18px;
+  margin-bottom: 6px;
+}
+
+.login-modal-sub {
+  font-size: 14px;
+  color: #555;
+  margin-bottom: 18px;
+}
+
+.login-field {
+  display: block;
+  text-align: left;
+  font-size: 14px;
+  margin-bottom: 12px;
+}
+
+.login-field span {
+  display: block;
+  margin-bottom: 4px;
+}
+
+.login-field input {
+  display: block;
+  width: 100%;
+  padding: 10px 12px;
+  /* iOS Safari：输入框字号 < 16px 时点按会整页放大，写死 16px 防放大。 */
+  font-size: 16px;
+  border: 1.5px solid rgba(57, 144, 155, 0.4);
+  border-radius: 12px;
+  background: rgba(255, 255, 255, 0.75);
+  outline: none;
+}
+
+.login-field input:focus {
+  border-color: rgb(57, 144, 155);
+  box-shadow: 0 0 0 3px rgba(57, 144, 155, 0.18);
+}
+
+.login-field input:disabled {
+  opacity: 0.6;
+}
+
+.login-modal-error {
+  margin: 0 0 12px;
+  color: #c00;
+  font-size: 14px;
+}
+
+.login-modal-primary {
+  width: 100%;
+  padding: 10px 24px;
+  font-size: 15px;
+  color: #fff;
+  background: rgb(57, 144, 155);
+  border: 0;
+  border-radius: 50px;
+  box-shadow: 2px 4px 6px rgba(0, 0, 0, 0.2);
+  cursor: pointer;
+}
+
+.login-modal-primary:disabled {
+  opacity: 0.6;
+  cursor: default;
+}
+
+.login-modal-cancel {
+  margin-top: 10px;
+  padding: 9px 18px;
+  font-size: 14px;
+  border-radius: 50px;
+  border: 1.5px solid rgba(57, 144, 155, 0.4);
+  background: rgba(255, 255, 255, 0.75);
+  color: rgb(57, 144, 155);
+  cursor: pointer;
+}
+
+.login-modal-cancel:disabled {
+  opacity: 0.6;
+  cursor: default;
+}
+
+.login-modal-hint {
+  margin-top: 14px;
+  font-size: 12px;
+  color: #888;
+}
+
+/* 复制反馈 toast：底部居中，两皮肤通用深底浅字。 */
+.pan-toast {
+  position: fixed;
+  left: 50%;
+  bottom: 28px;
+  transform: translateX(-50%);
+  z-index: 10001;
+  padding: 10px 20px;
+  font-size: 14px;
+  color: #fff;
+  background: rgba(20, 24, 28, 0.92);
+  border: 1px solid rgba(255, 255, 255, 0.18);
+  border-radius: 999px;
+  box-shadow: 0 4px 16px rgba(0, 0, 0, 0.35);
+  white-space: nowrap;
+  max-width: calc(100vw - 32px);
+  overflow: hidden;
+  text-overflow: ellipsis;
+  pointer-events: none;
+  /* 每次出现都重建节点，动画随之重播一次。 */
+  animation: toast-in 0.18s ease-out;
+}
+
+@keyframes toast-in {
+  from {
+    opacity: 0;
+    transform: translate(-50%, 8px);
+  }
+  to {
+    opacity: 1;
+    transform: translate(-50%, 0);
+  }
+}
+
+/* 手动复制兜底框里的只读输入框：整段地址可点选/长按复制。 */
+.manual-copy-input {
+  width: 100%;
+  box-sizing: border-box;
+  margin-top: 10px;
+  padding: 10px 12px;
+  font-size: 14px;
+  color: #222;
+  background: #f6f6f6;
+  border: 1px solid #ddd;
+  border-radius: 8px;
 }
 </style>

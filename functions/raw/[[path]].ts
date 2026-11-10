@@ -1,13 +1,15 @@
 import { notFound, parseBucketPath } from '@/utils/bucket';
+import { isFolderMarker } from '@/utils/folder-marker';
 import { serveR2Object } from '@/utils/r2serve';
 import {
-  authRequiredResponse,
+  authRequiredResponseNoChallenge,
   canReadPath,
   configCorruptResponse,
   forbiddenResponse,
   getPermissionsConfig,
   getProtectionConfig,
   getReadIdentity,
+  isBrowserNavigation,
   shareGrantCovers,
   verifyShareGrant,
 } from '@/utils/read-auth';
@@ -23,6 +25,10 @@ async function handle(context) {
   const [bucket, path] = parseBucketPath(context);
   const db = context.env['DB'] || null;
   if (!bucket) return notFound();
+
+  // A folder marker is a storage internal, never content: it is not
+  // downloadable or previewable even when the URL is guessed.
+  if (isFolderMarker(path)) return notFound();
 
   // Transcode internals are never web-servable via /raw/: the cache
   // inherits the source's protection and is only served via /transcode/.
@@ -47,7 +53,22 @@ async function handle(context) {
       !canReadPath(path, identity, config.protected, rules) &&
       !shareGrantCovers(grant, path)
     ) {
-      return identity || grant ? forbiddenResponse() : authRequiredResponse();
+      if (!identity && !grant) {
+        // Top-level navigation (user opening the file link in a tab):
+        // send the browser back to the site, which pops the themed
+        // login dialog and returns here after login. Any other
+        // request gets the plain JSON 401 — never a native dialog.
+        if (isBrowserNavigation(context.request)) {
+          const u = new URL(context.request.url);
+          const next = encodeURIComponent(u.pathname + u.search);
+          return Response.redirect(
+            new URL(`/?login=1&next=${next}`, u.origin).toString(),
+            302
+          );
+        }
+        return authRequiredResponseNoChallenge();
+      }
+      return forbiddenResponse();
     }
   }
 

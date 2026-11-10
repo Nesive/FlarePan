@@ -107,3 +107,48 @@ export async function multipartUpload(key, file, options) {
     parts: uploadedParts,
   });
 }
+
+/**
+ * Copy text to the clipboard, with fallbacks.
+ *
+ * navigator.clipboard.writeText needs a user gesture: after an awaited
+ * network round-trip (e.g. /api/shorten) the transient activation may
+ * already be gone, and on iOS Safari / in-app webviews the call then
+ * rejects with NotAllowedError even though it started from a click.
+ * document.execCommand('copy') is the fallback that still works there;
+ * when both fail the caller shows the text in a manual-copy dialog
+ * instead of window.prompt (prompt is suppressed in many webviews).
+ * Returns true when the text is on the clipboard, false otherwise.
+ *
+ * @param {string} text
+ * @return {Promise<boolean>}
+ */
+export async function copyTextToClipboard(text) {
+  if (typeof text !== 'string' || !text) return false;
+  try {
+    if (navigator.clipboard && navigator.clipboard.writeText) {
+      await navigator.clipboard.writeText(text);
+      return true;
+    }
+  } catch (e) {
+    // Fall through to execCommand below.
+  }
+  try {
+    const ta = document.createElement('textarea');
+    ta.value = text;
+    ta.setAttribute('readonly', '');
+    ta.style.position = 'fixed';
+    ta.style.top = '0';
+    ta.style.left = '0';
+    ta.style.opacity = '0';
+    document.body.appendChild(ta);
+    ta.focus();
+    ta.select();
+    ta.setSelectionRange(0, text.length);
+    const ok = document.execCommand('copy');
+    document.body.removeChild(ta);
+    return !!ok;
+  } catch (e) {
+    return false;
+  }
+}

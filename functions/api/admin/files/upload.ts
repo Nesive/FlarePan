@@ -9,6 +9,8 @@
 // object at "<folder>/_$folder$".
 
 import { parseBucketPath } from '@/utils/bucket';
+import { hasFolderMarkerSegment } from '@/utils/folder-marker';
+import { resolveUploadContentType } from '@/utils/media-types';
 import {
   checkUpload,
   recordUpload,
@@ -68,6 +70,11 @@ export async function onRequestPost(context) {
   if (key.startsWith('_$flaredrive$/')) {
     return json({ error: 'invalid_path' }, 400);
   }
+  // "_$folder$" is a reserved segment: no file may be named that,
+  // and nothing may be stored under a marker path.
+  if (hasFolderMarkerSegment(key)) {
+    return json({ error: 'invalid_path' }, 400);
+  }
   const permConfig = await getPermissionsConfig(db);
   const rules = permConfig.corrupted ? [] : permConfig.rules;
   if (!canWritePath(key, gate, rules)) {
@@ -91,7 +98,12 @@ export async function onRequestPost(context) {
   }
   try {
     await bucket.put(key, data, {
-      httpMetadata: file.type ? { contentType: file.type } : undefined,
+      // file.type is empty when the browser could not guess it; fall
+      // back to the extension so the object is not stored as
+      // application/octet-stream (same rule as the other write paths).
+      httpMetadata: {
+        contentType: resolveUploadContentType(file.type, key),
+      },
     });
     await recordUpload(db, key, data.byteLength, identity, Date.now());
     await sweepExpired(db, bucket, Date.now(), 50);

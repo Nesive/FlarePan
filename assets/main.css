@@ -86,6 +86,11 @@ input[type="search"] {
   user-select: none;
 }
 
+/* 触屏点按即时反馈：hover 只在桌面生效，:active 让手机点按也有按压感。 */
+.file-item:active {
+  background-color: rgba(0, 0, 0, 0.08);
+}
+
 .file-icon {
   width: 48px;
   height: 48px;
@@ -191,5 +196,46 @@ button {
   .file-attr {
     white-space: normal;
     line-height: 1.5;
+  }
+}
+
+/* 文件夹切换淡入：只在导航后由 JS 挂一次 class（搜索/排序不走
+   fetchFiles，不会误触发）；140ms 很短，只柔化替换、不拖慢感知。 */
+.file-list-container.list-in {
+  animation: list-in 0.14s ease-out;
+}
+
+@keyframes list-in {
+  from {
+    opacity: 0.55;
+    transform: translateY(2px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+/* 导航时保留旧列表，顶部一条细加载条表示正在取新文件夹。 */
+.list-loading-bar {
+  height: 2px;
+  border-radius: 2px;
+  margin: 0 10px 6px;
+  background: linear-gradient(
+    90deg,
+    rgba(57, 144, 155, 0.15),
+    rgb(57, 144, 155),
+    rgba(57, 144, 155, 0.15)
+  );
+  background-size: 200% 100%;
+  animation: list-loading-slide 1s linear infinite;
+}
+
+@keyframes list-loading-slide {
+  from {
+    background-position: 200% 0;
+  }
+  to {
+    background-position: -200% 0;
   }
 }

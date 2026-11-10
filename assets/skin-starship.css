@@ -496,6 +496,49 @@ html[data-skin="starship"] .audio-prompt-btns button.audio-prompt-primary {
   color: #0b0630;
   border-color: transparent;
 }
+
+/* 管理员登录弹窗（星空）：与分享输码区同款深色形态，青色点缀。
+   容器本身已由上方的 .dialog-container 星空规则改成深色渐变。 */
+html[data-skin="starship"] .login-modal-sub {
+  color: #8b949e;
+}
+
+html[data-skin="starship"] .login-field {
+  color: #e6edf3;
+}
+
+html[data-skin="starship"] .login-field input {
+  border: 1.5px solid rgba(0, 229, 255, 0.45);
+  background: rgba(2, 1, 8, 0.55);
+  color: #e6edf3;
+}
+
+html[data-skin="starship"] .login-field input:focus {
+  border-color: #00e5ff;
+  box-shadow: 0 0 0 3px rgba(0, 229, 255, 0.2);
+}
+
+html[data-skin="starship"] .login-modal-error {
+  color: #f778ba;
+}
+
+html[data-skin="starship"] .login-modal-primary {
+  font-weight: 700;
+  color: #0b0630;
+  background: linear-gradient(135deg, #00e5ff, #a78bfa);
+  box-shadow: 0 0 20px rgba(0, 229, 255, 0.45);
+}
+
+html[data-skin="starship"] .login-modal-cancel {
+  border: 1.5px solid rgba(0, 229, 255, 0.45);
+  background: rgba(255, 255, 255, 0.07);
+  color: #e6edf3;
+}
+
+html[data-skin="starship"] .login-modal-hint {
+  color: #8b949e;
+}
+
 html[data-skin="starship"] .admin-page {
   min-height: 100%;
   padding: 24px 16px 60px;

@@ -24,7 +24,7 @@
 
 import { sha256Hex } from '@/utils/read-auth';
 import {
-  authRequiredResponse,
+  authRequiredResponseNoChallenge,
   canReadPath,
   configCorruptResponse,
   forbiddenResponse,
@@ -202,7 +202,7 @@ export async function onRequest(context) {
     const permConfig = await getPermissionsConfig(db);
     const rules = permConfig.corrupted ? [] : permConfig.rules;
     const identity = await getReadIdentity(context, db);
-    if (!identity) return authRequiredResponse();
+    if (!identity) return authRequiredResponseNoChallenge();
     if (!canReadPath(normalized.protectedPath,
     identity,
     config.protected,

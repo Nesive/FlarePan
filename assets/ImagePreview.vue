@@ -12,7 +12,8 @@
       :disabled="currentIndex === 0"
       @click="step(-1)"
       title="上一张">‹</button>
-    <div class="image-stage" :class="{ zoomed }" @click="zoomed = !zoomed">
+    <div class="image-stage" :class="{ zoomed }" @click="onStageClick"
+      @touchstart="onTouchStart" @touchend="onTouchEnd">
       <img
         v-if="!failed"
         :src="current.url"
@@ -49,6 +50,10 @@ export default {
       currentIndex: this.index,
       failed: false,
       zoomed: false,
+      touchStartX: 0,
+      touchStartY: 0,
+      // 滑动换图后浏览器可能仍合成一次 click：锁住它，不触发缩放。
+      swipeLock: false,
     };
   },
 
@@ -69,10 +74,14 @@ export default {
       this.failed = false;
       this.zoomed = false;
     },
+    currentIndex() {
+      this.preloadNeighbors();
+    },
   },
 
   mounted() {
     window.addEventListener('keydown', this.onKey);
+    this.preloadNeighbors();
   },
 
   beforeUnmount() {
@@ -92,6 +101,53 @@ export default {
       if (e.key === 'ArrowLeft') this.step(-1);
       else if (e.key === 'ArrowRight') this.step(1);
       else if (e.key === 'Escape') this.$emit('close');
+    },
+
+    // 预加载相邻图：切换到下一张时图片已在缓存里，立即显示、不空白。
+    preloadNeighbors() {
+      const urls = [];
+      if (this.currentIndex > 0) {
+        const prev = this.images[this.currentIndex - 1];
+        if (prev && prev.url) urls.push(prev.url);
+      }
+      if (this.currentIndex < this.images.length - 1) {
+        const next = this.images[this.currentIndex + 1];
+        if (next && next.url) urls.push(next.url);
+      }
+      urls.forEach((url) => {
+        const im = new Image();
+        im.src = url;
+      });
+    },
+
+    onStageClick() {
+      if (this.swipeLock) return;
+      this.zoomed = !this.zoomed;
+    },
+
+    // 手机滑动换图：未放大时横滑 >60px 且横向主导则换图；放大时
+    // 横滑留给图片自身的滚动（见 touch-action），不换图。
+    onTouchStart(e) {
+      const t = e.changedTouches && e.changedTouches[0];
+      if (!t) return;
+      this.touchStartX = t.clientX;
+      this.touchStartY = t.clientY;
+    },
+
+    onTouchEnd(e) {
+      if (this.zoomed) return;
+      const t = e.changedTouches && e.changedTouches[0];
+      if (!t) return;
+      const dx = t.clientX - this.touchStartX;
+      const dy = t.clientY - this.touchStartY;
+      if (Math.abs(dx) > 60 && Math.abs(dx) > Math.abs(dy) * 1.5) {
+        // 锁住随后可能合成的 click，免得换图后立刻被缩放。
+        this.swipeLock = true;
+        setTimeout(() => {
+          this.swipeLock = false;
+        }, 80);
+        this.step(dx < 0 ? 1 : -1);
+      }
     },
   },
 };
@@ -144,10 +200,13 @@ export default {
   overflow: hidden;
   cursor: zoom-in;
   padding: 8px;
+  /* 横滑由 JS 接管换图，竖滑仍走原生滚动（放大后看图用）。 */
+  touch-action: pan-y;
 }
 .image-stage.zoomed {
   overflow: auto;
   cursor: zoom-out;
+  touch-action: auto;
 }
 .image-stage img {
   max-width: 100%;

@@ -18,6 +18,7 @@
 // part (the response says how many were copied).
 
 import { parseBucketPath } from '@/utils/bucket';
+import { hasFolderMarkerSegment } from '@/utils/folder-marker';
 import {
   moveLedgerKey,
   moveLedgerPrefix,
@@ -149,6 +150,11 @@ export async function onRequestPost(context) {
   }
 
   if (action === 'mkdir') {
+    // "_$folder$" is reserved: a folder may not be created under
+    // (or as) a marker path. The marker itself is written below.
+    if (hasFolderMarkerSegment(key)) {
+      return json({ error: 'invalid_key' }, 400);
+    }
     const marker = `${key}/_$folder$`;
     const existed = !!(await bucket.head(marker));
     if (!existed) {
@@ -163,6 +169,10 @@ export async function onRequestPost(context) {
     const target = validateUserPath(body && body.target, false);
     if (target === null || target === key
       || parentDir(target) !== parentDir(key)) {
+      return json({ error: 'invalid_target' }, 400);
+    }
+    if (hasFolderMarkerSegment(key)
+      || hasFolderMarkerSegment(target)) {
       return json({ error: 'invalid_target' }, 400);
     }
     if (!canWritePath(target, gate, rules)) {
@@ -220,6 +230,11 @@ export async function onRequestPost(context) {
     return json({ error: 'invalid_target' }, 400);
   }
   if (target === key) {
+    return json({ error: 'invalid_target' }, 400);
+  }
+  // "_$folder$" is reserved in file names and target paths.
+  if (hasFolderMarkerSegment(key)
+    || hasFolderMarkerSegment(target)) {
     return json({ error: 'invalid_target' }, 400);
   }
   if (!canWritePath(target, gate, rules)) {

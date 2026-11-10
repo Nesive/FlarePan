@@ -1,13 +1,14 @@
 import { notFound, parseBucketPath } from '@/utils/bucket';
 import { serveR2Object } from '@/utils/r2serve';
 import {
-  authRequiredResponse,
+  authRequiredResponseNoChallenge,
   canReadPath,
   configCorruptResponse,
   forbiddenResponse,
   getPermissionsConfig,
   getProtectionConfig,
   getReadIdentity,
+  isBrowserNavigation,
   shareGrantCovers,
   verifyShareGrant,
 } from '@/utils/read-auth';
@@ -78,7 +79,20 @@ export async function onRequestGet(context) {
     !canReadPath(sourceKey, identity, config.protected, rules) &&
     !shareGrantCovers(grant, sourceKey)
   ) {
-    return identity || grant ? forbiddenResponse() : authRequiredResponse();
+    if (!identity && !grant) {
+      // Same navigation rule as /raw/: a tab opening this link goes
+      // back to the site login dialog instead of a native popup.
+      if (isBrowserNavigation(context.request)) {
+        const u = new URL(context.request.url);
+        const next = encodeURIComponent(u.pathname + u.search);
+        return Response.redirect(
+          new URL(`/?login=1&next=${next}`, u.origin).toString(),
+          302
+        );
+      }
+      return authRequiredResponseNoChallenge();
+    }
+    return forbiddenResponse();
   }
 
   const sourceHead = await bucket.head(sourceKey);

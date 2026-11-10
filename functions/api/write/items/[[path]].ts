@@ -1,5 +1,7 @@
 import { get_auth_status } from '@/utils/auth';
 import { notFound, parseBucketPath } from '@/utils/bucket';
+import { hasFolderMarkerSegment } from '@/utils/folder-marker';
+import { resolveUploadContentType } from '@/utils/media-types';
 import { requireAdminCookie } from '@/utils/read-auth';
 import {
   checkUpload,
@@ -14,6 +16,12 @@ import {
 export async function onRequestPostCreateMultipart(context) {
   const [bucket, path] = parseBucketPath(context);
   if (!bucket) return notFound();
+
+  // "_$folder$" is a reserved segment: no upload may be named that,
+  // and nothing may be stored under a marker path.
+  if (hasFolderMarkerSegment(path)) {
+    return new Response('invalid_key', { status: 400 });
+  }
 
   const request: Request = context.request;
   const db = context.env['DB'] || null;
@@ -43,7 +51,8 @@ export async function onRequestPostCreateMultipart(context) {
 
   const multipartUpload = await bucket.createMultipartUpload(path, {
     httpMetadata: {
-      contentType: request.headers.get('content-type'),
+      contentType: resolveUploadContentType(
+        request.headers.get('content-type'), path),
     },
     customMetadata,
   });
@@ -158,8 +167,10 @@ export async function onRequestPut(context) {
       if (!(gate instanceof Response)) adminOk = true;
     }
     if (!adminOk) {
+      // No Basic challenge here: this is a web UI call, and a
+      // challenge would make the browser pop its native login dialog.
+      // (DAV keeps its own challenge; see utils/read-auth.ts.)
       const header = new Headers();
-      header.set('WWW-Authenticate','Basic realm="需要登录"');
       return new Response('没有操作权限', {
           status: 401,
           headers: header,
@@ -174,6 +185,11 @@ export async function onRequestPut(context) {
 
   const [bucket, path] = parseBucketPath(context);
   if (!bucket) return notFound();
+
+  // "_$folder$" is a reserved segment (see create-multipart above).
+  if (hasFolderMarkerSegment(path)) {
+    return new Response('invalid_key', { status: 400 });
+  }
 
   const request: Request = context.request;
   const db = context.env['DB'] || null;
@@ -198,21 +214,46 @@ export async function onRequestPut(context) {
 
   let content = request.body;
   const customMetadata: Record<string, string> = {};
+  // Copy branch: keep the source object's metadata. The stored
+  // Content-Type wins when it is a real type; an octet-stream or
+  // missing source type falls back to the same header -> extension
+  // resolution as a fresh upload (so a copy of a legacy octet-stream
+  // object still lands with a usable type).
+  let sourceHttpMetadata = null;
 
   if (request.headers.has('x-amz-copy-source')) {
     const sourceName = decodeURIComponent(
       request.headers.get('x-amz-copy-source')
     );
+    // A marker is not a file: it cannot be copied as one.
+    if (hasFolderMarkerSegment(sourceName)) {
+      return new Response('invalid_key', { status: 400 });
+    }
     const source = await bucket.get(sourceName);
     content = source.body;
-    if (source.customMetadata.thumbnail)
-      customMetadata.thumbnail = source.customMetadata.thumbnail;
+    Object.assign(customMetadata, source.customMetadata || {});
+    sourceHttpMetadata = source.httpMetadata || null;
   }
 
   if (request.headers.has('fd-thumbnail'))
     customMetadata.thumbnail = request.headers.get('fd-thumbnail');
 
-  const obj = await bucket.put(path, content, { customMetadata });
+  const sourceType = (sourceHttpMetadata?.contentType || '').trim();
+  const sourceTypeLower = sourceType.toLowerCase();
+  const contentType = sourceType
+    && sourceTypeLower !== 'application/octet-stream'
+    && !sourceTypeLower.startsWith('application/octet-stream;')
+    ? sourceType
+    : resolveUploadContentType(
+        request.headers.get('content-type'), path);
+
+  const obj = await bucket.put(path, content, {
+    httpMetadata: {
+      ...(sourceHttpMetadata || {}),
+      contentType,
+    },
+    customMetadata,
+  });
   if (db) {
     if (!identity) identity = await requestIdentity(request);
     const denied = await checkUpload(
@@ -235,8 +276,8 @@ export async function onRequestPut(context) {
 
 export async function onRequestDelete(context) {
   if (!get_auth_status(context)) {
+    // No Basic challenge here either (see the PUT handler above).
     const header = new Headers();
-    header.set('WWW-Authenticate','Basic realm="需要登录"');
     return new Response('没有操作权限', {
         status: 401,
         headers: header,

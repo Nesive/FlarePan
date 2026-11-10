@@ -1135,10 +1135,12 @@ export async function isDavDisabledIdentity(context, db) {
 // Management-endpoint gate: cookie session only, admin only.
 // Returns the identity, or a Response to return directly (401 when
 // unauthenticated — including Basic Auth, which is never accepted
-// here — 403 when authenticated but not an admin).
+// here — 403 when authenticated but not an admin). The 401 carries no
+// Basic challenge: management endpoints are web UI calls, and a
+// challenge would make the browser pop its native login dialog.
 export async function requireAdminCookie(context, db) {
   const identity = await getSessionIdentity(context, db);
-  if (!identity) return authRequiredResponse();
+  if (!identity) return authRequiredResponseNoChallenge();
   if (!identity.isAdmin) return forbiddenResponse();
   return identity;
 }
@@ -1159,6 +1161,31 @@ export function authRequiredResponse() {
     status: 401,
     headers,
   });
+}
+
+// Web-facing 401 without a Basic challenge: same JSON body, no
+// WWW-Authenticate header, so the browser never pops its native login
+// dialog. Web routes (raw, transcode, children, shorten, management
+// endpoints, write/items) use this; DAV keeps the challenge variant
+// above because DAV clients (rclone, Finder, …) rely on it to prompt
+// for credentials.
+export function authRequiredResponseNoChallenge() {
+  return new Response(JSON.stringify({ error: 'login_required' }), {
+    status: 401,
+    headers: { 'Content-Type': 'application/json' },
+  });
+}
+
+// Whether the request is a top-level browser navigation (a user
+// opening a link in a tab). Such a request cannot show the in-app
+// login dialog, so web routes 302 it back to the site, which pops the
+// themed dialog and returns to the original URL after login. fetch /
+// XHR / img / video requests are not navigations and get the JSON 401
+// instead.
+export function isBrowserNavigation(request) {
+  if (request.headers.get('Sec-Fetch-Mode') === 'navigate') return true;
+  const accept = request.headers.get('Accept') || '';
+  return accept.includes('text/html');
 }
 
 export function forbiddenResponse() {

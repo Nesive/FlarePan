@@ -14,6 +14,7 @@
 // The internal _$flaredrive$/ prefix is never exposed here.
 
 import { notFound, parseBucketPath } from '@/utils/bucket';
+import { isFolderMarker, hasFolderMarkerSegment } from '@/utils/folder-marker';
 import {
   checkUpload,
   moveLedgerKey,
@@ -23,6 +24,7 @@ import {
   sweepExpired,
 } from '@/utils/upload-limits';
 import { serveR2Object } from '@/utils/r2serve';
+import { resolveUploadContentType } from '@/utils/media-types';
 import {
   authRequiredResponse,
   canReadPath,
@@ -115,7 +117,13 @@ async function folderExists(bucket, path) {
 
 async function resourceKind(bucket, path) {
   // "file" | "collection" | null
+  // A folder marker is a storage internal, never a file or a
+  // collection: every DAV verb on a marker path answers 404, so no
+  // client can ever display, download, move or copy one. (The
+  // folderExistence check below still reads "<path>/_$folder$" to
+  // decide whether <path> is a folder; that is a different key.)
   if (!path) return 'collection';
+  if (isFolderMarker(path)) return null;
   if (await bucket.head(path)) return 'file';
   if (await folderExists(bucket, path)) return 'collection';
   return null;
@@ -206,7 +214,7 @@ rules) {
     const prefix = path ? `${path}/` : '';
     const { objects, folders } = await listDir(bucket, prefix);
     for (const obj of objects) {
-      if (obj.key.endsWith('/_$folder$')) continue;
+      if (isFolderMarker(obj.key)) continue;
       if (obj.key.startsWith('_$flaredrive$/')) continue;
       // Same caliber-B filtering as the web listing: protected entries
       // are hidden from callers without access to them.
@@ -222,6 +230,7 @@ rules) {
       );
     }
     for (const folder of folders) {
+      if (hasFolderMarkerSegment(folder)) continue;
       if (folder.startsWith('_$flaredrive$/')) continue;
       if (
         isProtectedPath(folder, protectedList) &&
@@ -240,6 +249,11 @@ rules) {
 
 async function handlePut(context, bucket, path, identity) {
   if (!path) return methodNotAllowed();
+  // "_$folder$" is a reserved segment: no user file may be named
+  // that, and nothing may be stored under a marker path.
+  if (hasFolderMarkerSegment(path)) {
+    return new Response('Invalid path', { status: 400 });
+  }
   if ((await resourceKind(bucket, path)) === 'collection') {
     return methodNotAllowed();
   }
@@ -258,9 +272,15 @@ async function handlePut(context, bucket, path, identity) {
     }
   }
   const existed = !!(await bucket.head(path));
-  const contentType = context.request.headers.get('content-type');
+  // Same rule as the web simple PUT: a real declared header wins,
+  // otherwise infer from the extension so the object is not stored
+  // as application/octet-stream (browsers would download it instead
+  // of displaying it inline). Unknown extensions keep octet-stream.
   const obj = await bucket.put(path, context.request.body, {
-    httpMetadata: contentType ? { contentType } : undefined,
+    httpMetadata: {
+      contentType: resolveUploadContentType(
+        context.request.headers.get('content-type'), path),
+    },
   });
   if (db) {
     const denied = await checkUpload(
@@ -297,6 +317,12 @@ async function handleDelete(context, bucket, path) {
 
 async function handleMkcol(context, bucket, path) {
   if (!path) return methodNotAllowed();
+  // A folder may not be created under (or as) a marker path; the
+  // marker itself is written by this handler below, never by the
+  // caller naming it.
+  if (hasFolderMarkerSegment(path)) {
+    return new Response('Invalid path', { status: 400 });
+  }
   const contentLength = context.request.headers.get('content-length');
   if (contentLength && parseInt(contentLength, 10) > 0) {
     return new Response('MKCOL with a body is not supported', { status: 415 });
@@ -343,6 +369,10 @@ async function handleMoveCopy(context, bucket, path, isMove, identity) {
   }
   const dest = destSegments.join('/');
   if (!dest || dest.startsWith('_$flaredrive$/')) {
+    return new Response('Invalid Destination', { status: 400 });
+  }
+  // Never move/copy anything under (or as) a marker path.
+  if (hasFolderMarkerSegment(dest)) {
     return new Response('Invalid Destination', { status: 400 });
   }
 
