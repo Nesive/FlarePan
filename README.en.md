@@ -26,6 +26,31 @@ file, 500 MB per day, 5 GB total, and new uploads expire after 24 hours.
 Do not store anything important on the demo. DAV works with the demo
 account, with write access under the `demo/` directory.
 
+## Screenshots
+
+![Feature tour](screenshots/showcase-en-flarepan.gif)
+
+A real feature tour from the live demo: Starship and Original themes, instant skin switching, planet favicon, multi-account and folder-level permissions, WebDAV, the short-link master switch, in-site Markdown viewing, the bottom audio player, the centered video window, and the image lightbox.
+
+Feature demo video (cut from real screenshots, 94s): [pan-demo.mp4](screenshots/pan-demo.mp4)
+
+<table>
+  <tr>
+    <td><img src="screenshots/front-mobile-flarepan.png" alt="Mobile Starship" width="360"></td>
+    <td><img src="screenshots/front-mobile-original-flarepan.png" alt="Mobile Original" width="360"></td>
+  </tr>
+  <tr>
+    <td align="center">Mobile Starship</td>
+    <td align="center">Mobile Original</td>
+  </tr>
+</table>
+
+Mobile is fully featured too: search, folders, file lists and viewers all work, and both themes switch the same way on phones.
+
+![Tab planet favicon](screenshots/favicon-tab-flarepan.png)
+
+The favicon follows the skin: a transparent planet icon with no white or square background on the browser tab.
+
 ## Lineage and thanks
 
 This project is a further development of open-source file libraries,

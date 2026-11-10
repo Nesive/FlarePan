@@ -4,8 +4,20 @@
       ref="mainScroll"
       @dragenter.prevent
       @dragover.prevent
+      @touchstart="onPtrTouchStart"
+      @touchmove="onPtrTouchMove"
+      @touchend="onPtrTouchEnd"
+      @touchcancel="onPtrTouchEnd"
       :style="{ backgroundImage: isStarship ? undefined : `url('${backgroundImageUrl}')`, paddingBottom: playerQueue.length ? '76px' : '' }"
   >
+    <div
+      class="ptr-indicator"
+      :class="{ 'ptr-pulling': ptrState === 'pulling' }"
+      :style="{ height: ptrHeight + 'px' }"
+      aria-hidden="true">
+      <span v-if="ptrState === 'refreshing'" class="ptr-spinner"></span>
+      <span class="ptr-text">{{ ptrLabel }}</span>
+    </div>
 <template v-if="isStarship">
     <div class="app-bar">
       <div class="hero">
@@ -235,13 +247,6 @@
             </div>
             <div class="file-info-container"><span class="file-name" v-text="folder.match(/.*?([^/]*)\/?$/)[1]"></span>
             </div>
-            <div
-              v-if="!shareMode && siteShortlinkEnabled"
-              style="margin-left: auto; margin-right: 10px;"
-              @click.stop="copyShortLink(`/?p=${encodeURIComponent(folder)}`, 'folder:' + folder)" title="复制短链" class="iconbtn">
-              <span v-if="copiedItem === 'folder:' + folder" :style="{ fontSize: '18px', color: isStarship ? '#7CFFB2' : '#1a7a1a' }">✓</span>
-              <svg v-else width="17" height="17" viewBox="0 0 24 24" fill="none" :stroke="isStarship ? '#c9d1d9' : '#2c2c2c'" stroke-width="1.8"><path d="M10 14a5 5 0 0 0 7 0l2-2a5 5 0 0 0-7-7l-1 1M14 10a5 5 0 0 0-7 0l-2 2a5 5 0 0 0 7 7l1-1"/></svg>
-            </div>
             <div v-if="!shareMode" style="margin-right: 10px;" class="iconbtn" @click.stop="
               showContextMenu = true;
             focusedItem = folder;
@@ -275,14 +280,6 @@
                 <span v-text="new Date(file.uploaded).toLocaleString()"></span>
                 <span v-text="formatSize(file.size)"></span>
               </div>
-            </div>
-            <div
-              v-if="!shareMode && siteShortlinkEnabled"
-              style="margin-left: auto; margin-right: 10px;"
-              @click.stop="copyShortLink('/raw/' + file.key.split('/').map(encodeURIComponent).join('/'), 'file:' + file.key)"
-              title="复制短链" class="iconbtn">
-              <span v-if="copiedItem === 'file:' + file.key" :style="{ fontSize: '18px', color: isStarship ? '#7CFFB2' : '#1a7a1a' }">✓</span>
-              <svg v-else width="17" height="17" viewBox="0 0 24 24" fill="none" :stroke="isStarship ? '#c9d1d9' : '#2c2c2c'" stroke-width="1.8"><path d="M10 14a5 5 0 0 0 7 0l2-2a5 5 0 0 0-7-7l-1 1M14 10a5 5 0 0 0-7 0l-2 2a5 5 0 0 0 7 7l1-1"/></svg>
             </div>
             <div v-if="!shareMode" style="margin-right: 10px;" class="iconbtn" @click.stop="
               showContextMenu = true;
@@ -334,13 +331,8 @@
       </div>
       <ul v-if="typeof focusedItem === 'string'" class="contextmenu-list">
         <li>
-          <button @click="copyLink(`/?p=${encodeURIComponent(focusedItem)}`)">
+          <button @click="copyLink(`/?p=${encodeURIComponent(focusedItem)}`, 'folder:' + focusedItem)">
             <span>复制链接</span>
-          </button>
-        </li>
-        <li v-if="siteShortlinkEnabled">
-          <button @click="copyShortLink(`/?p=${encodeURIComponent(focusedItem)}`, 'folder:' + focusedItem)">
-            <span>复制短链</span>
           </button>
         </li>
       </ul>
@@ -352,13 +344,8 @@
           </button>
         </li>
         <li>
-          <button @click="copyLink(`/raw/${focusedItem.key}`)">
+          <button @click="copyLink('/raw/' + focusedItem.key.split('/').map(encodeURIComponent).join('/'), 'file:' + focusedItem.key)">
             <span>复制链接</span>
-          </button>
-        </li>
-        <li v-if="siteShortlinkEnabled">
-          <button @click="copyShortLink('/raw/' + focusedItem.key.split('/').map(encodeURIComponent).join('/'), 'file:' + focusedItem.key)">
-            <span>复制短链</span>
           </button>
         </li>
       </ul>
@@ -508,6 +495,11 @@ function normalizeCwd(p) {
 // 被本站写脏；后台页上传后由后台页自己刷新，前台 60 秒后自然更新）。
 const FOLDER_CACHE_TTL_MS = 60 * 1000;
 
+// 应用内下拉刷新：列表到顶下拉超过该距离松开即重载当前文件夹。
+// 指示器高度上限（手指位移按 0.5 折算后封顶）。
+const PTR_PULL_THRESHOLD = 60;
+const PTR_MAX_PULL = 80;
+
 export default {
   data: () => ({
     cwd: normalizeCwd(new URL(window.location).searchParams.get('p') || ''),
@@ -520,6 +512,13 @@ export default {
     showContextMenu: false,
     showMenu: false,
     copiedItem: null,
+    // 应用内下拉刷新状态：ptrTracking 只在 touchstart 时列表已到顶才
+    // 建立；ptrHeight 是指示器当前高度（px），ptrState 为
+    // 'idle' | 'pulling' | 'refreshing'。
+    ptrTracking: false,
+    ptrStartY: 0,
+    ptrHeight: 0,
+    ptrState: 'idle',
     // 文件夹缓存：cwd → { files, folders, at }（见 FOLDER_CACHE_TTL_MS）。
     // 命中直接渲染、零请求；过期命中先渲染旧数据、后台静默刷新。
     // 分享模式不用缓存（授权可能过期，始终请求）。
@@ -554,7 +553,7 @@ export default {
     // 前端版本戳：每次部署同步 bump（见 assets/version.json）。
     // 手机浏览器常把标签页留存数日不刷新，旧代码会让视频继续走新标签页；
     // 已加载的旧页在切回可见时发现版本不一致就自动重载，之后不再有旧代码。
-    appVersion: '20261110-03', // 注意：与 assets/version.json 的 version 必须同步改，两处不一致时前台挂载即循环 reload（2026-11-04 -21 教训）
+    appVersion: '20261110-04', // 注意：与 assets/version.json 的 version 必须同步改，两处不一致时前台挂载即循环 reload（2026-11-04 -21 教训）
     // 播放器挂在 App 根节点，文件夹切换、前进后退、PDF 浮层都不卸载它。
     playerQueue: [],
     playerStartIndex: 0,
@@ -610,6 +609,12 @@ export default {
   }),
 
   computed: {
+    // 下拉刷新指示器文案：刷新中固定，拉过阈值提示松开，否则提示下拉。
+    ptrLabel() {
+      if (this.ptrState === 'refreshing') return '正在刷新…';
+      return this.ptrHeight >= PTR_PULL_THRESHOLD ? '松开刷新' : '下拉刷新';
+    },
+
     isAdminPage() {
       const p = window.location.pathname;
       return p === '/admin' || p.startsWith('/admin/');
@@ -729,55 +734,55 @@ export default {
       this.manualCopyText = '';
     },
 
-    async copyLink(link) {
+    // 复制链接（菜单唯一入口）：短链优先，长链兜底。
+    // 短链总开关开着时先调 /api/shorten 拿短链并复制；短链未配置、
+    // 短链接口报错或写剪贴板失败时，一律回落到复制长链（不 alert、
+    // 不中断）。401 时弹站内登录框，登录成功后重试本次复制。
+    async copyLink(link, itemKey) {
       this.showContextMenu = false;
+      const key = itemKey || (typeof this.focusedItem === 'string'
+        ? 'folder:' + this.focusedItem
+        : (this.focusedItem && this.focusedItem.key
+          ? 'file:' + this.focusedItem.key : null));
+      if (this.siteShortlinkEnabled) {
+        try {
+          const res = await fetch('/api/shorten', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ target: link }),
+          });
+          const data = await res.json().catch(() => ({}));
+          if (res.ok && data.shortLink) {
+            // 注意：写剪贴板发生在 await fetch 之后，用户手势可能已失效
+            //（iOS Safari 与内置浏览器常见），助手内部先试 Clipboard
+            // API 再试 execCommand，都失败才弹手动复制框。
+            const ok = await copyTextToClipboard(data.shortLink);
+            if (ok) {
+              this.markCopied(key);
+              this.showToast('短链已复制');
+            } else {
+              this.openManualCopy('短链地址（请手动复制）：', data.shortLink);
+            }
+            return;
+          }
+          if (res.status === 401) {
+            // 无权访问：弹站内登录框，登录成功后重试本次复制。
+            this.openLoginModal(() => this.copyLink(link, itemKey));
+            return;
+          }
+          // 其他短链失败（接口报错/无短链）：回落到长链。
+        } catch (e) {
+          // 网络异常：回落到长链。
+        }
+      }
       const url = new URL(link, window.location.origin).toString();
       const ok = await copyTextToClipboard(url);
       if (ok) {
         // 行内 ✓：按当前聚焦项换算（菜单里点的是它）。
-        const key = typeof this.focusedItem === 'string'
-          ? 'folder:' + this.focusedItem
-          : (this.focusedItem && this.focusedItem.key
-            ? 'file:' + this.focusedItem.key : null);
         this.markCopied(key);
         this.showToast('链接已复制');
       } else {
         this.openManualCopy('链接地址（请手动复制）：', url);
-      }
-    },
-
-    async copyShortLink(target, itemKey) {
-      if (!this.siteShortlinkEnabled) return;
-      this.showContextMenu = false;
-      try {
-        const res = await fetch('/api/shorten', {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ target }),
-        });
-        const data = await res.json().catch(() => ({}));
-        if (!res.ok) {
-          if (res.status === 401) {
-            // 无权访问：弹站内登录框，登录成功后重试本次复制。
-            this.openLoginModal(() => this.copyShortLink(target, itemKey));
-            return;
-          }
-          alert(data.error ? `复制短链失败：${data.error}` : '复制短链失败');
-          return;
-        }
-        const shortLink = data.shortLink;
-        // 注意：写剪贴板发生在 await fetch 之后，用户手势可能已失效
-        //（iOS Safari 与内置浏览器常见），助手内部先试 Clipboard
-        // API 再试 execCommand，都失败才弹手动复制框。
-        const ok = await copyTextToClipboard(shortLink);
-        if (ok) {
-          this.markCopied(itemKey);
-          this.showToast('短链已复制');
-        } else {
-          this.openManualCopy('短链地址（请手动复制）：', shortLink);
-        }
-      } catch (e) {
-        alert('复制短链失败');
       }
     },
 
@@ -1095,6 +1100,77 @@ export default {
           }
         })
         .catch(() => {});
+    },
+
+    // 应用内下拉刷新（touch 驱动）：只在列表已到顶时建立追踪；下拉
+    // 距离按 0.5 折算成指示器高度（封顶 PTR_MAX_PULL）。overscroll
+    // 仍为 none，原生下拉刷新不会触发；下拉时 preventDefault 阻止
+    // 容器本身的回弹滚动，指示器跟手。松开时拉过阈值即重载当前
+    // 文件夹（删缓存强制走网络），否则指示器收回。
+    onPtrTouchStart(e) {
+      if (this.ptrState === 'refreshing') return;
+      const el = this.$refs.mainScroll;
+      if (!el || el.scrollTop > 0) {
+        this.ptrTracking = false;
+        return;
+      }
+      const t = e.touches && e.touches[0];
+      if (!t) return;
+      this.ptrTracking = true;
+      this.ptrStartY = t.clientY;
+      this.ptrHeight = 0;
+    },
+
+    onPtrTouchMove(e) {
+      if (!this.ptrTracking || this.ptrState === 'refreshing') return;
+      const el = this.$refs.mainScroll;
+      const t = e.touches && e.touches[0];
+      if (!t || !el) return;
+      if (el.scrollTop > 0) {
+        this.ptrTracking = false;
+        this.ptrHeight = 0;
+        return;
+      }
+      const dy = t.clientY - this.ptrStartY;
+      if (dy <= 0) {
+        this.ptrHeight = 0;
+        return;
+      }
+      e.preventDefault();
+      this.ptrState = 'pulling';
+      this.ptrHeight = Math.min(dy * 0.5, PTR_MAX_PULL);
+    },
+
+    onPtrTouchEnd() {
+      if (!this.ptrTracking) return;
+      this.ptrTracking = false;
+      if (this.ptrState === 'pulling' && this.ptrHeight >= PTR_PULL_THRESHOLD) {
+        this.doPullRefresh();
+      } else {
+        this.ptrState = 'idle';
+        this.ptrHeight = 0;
+      }
+    },
+
+    doPullRefresh() {
+      if (this.ptrState === 'refreshing') return;
+      this.ptrState = 'refreshing';
+      this.ptrHeight = 48;
+      // 删缓存强制走网络：否则缓存新鲜时 fetchFiles 直接返回、不刷新。
+      delete this.folderCache[normalizeCwd(this.cwd)];
+      this.fetchFiles();
+      // 加载落定（loading 与 navLoading 都收起）即收起指示器；6 秒
+      // 上限兜底，请求挂住时指示器也不会一直卡着。
+      const t0 = Date.now();
+      const settle = () => {
+        if ((!this.loading && !this.navLoading) || Date.now() - t0 > 6000) {
+          this.ptrState = 'idle';
+          this.ptrHeight = 0;
+        } else {
+          setTimeout(settle, 120);
+        }
+      };
+      setTimeout(settle, 300);
     },
 
     formatSize(size) {
@@ -1501,6 +1577,43 @@ export default {
   flex-direction: column;
   /* 音频条出现/消失时 padding 渐变，内容不跳。 */
   transition: padding-bottom 0.25s ease;
+}
+
+/* 应用内下拉刷新指示器：平时高度为 0 不占位；列表到顶下拉时高度
+   跟手增长（松开后 0.2s 收回），刷新中固定 48px 转圈。拉动时
+   transition 关掉才跟手，收回/刷新态才有过渡。 */
+.ptr-indicator {
+  flex: none;
+  overflow: hidden;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+  color: #5a6b6e;
+  font-size: 14px;
+  transition: height 0.2s ease;
+}
+.ptr-indicator.ptr-pulling {
+  transition: none;
+}
+/* 指示器文案套白色小 pill：背景图再花也能读；星际深色主题下同样可读。 */
+.ptr-text {
+  background: rgba(255, 255, 255, 0.8);
+  padding: 3px 12px;
+  border-radius: 999px;
+  box-shadow: 0 1px 4px rgba(0, 0, 0, 0.12);
+}
+.ptr-spinner {
+  width: 16px;
+  height: 16px;
+  border: 2px solid rgba(0, 0, 0, 0.15);
+  border-top-color: #00bcd4;
+  border-radius: 50%;
+  background: rgba(255, 255, 255, 0.8);
+  animation: ptr-spin 0.8s linear infinite;
+}
+@keyframes ptr-spin {
+  to { transform: rotate(360deg); }
 }
 
 .app-bar {
