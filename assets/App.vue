@@ -554,7 +554,7 @@ export default {
     // 前端版本戳：每次部署同步 bump（见 assets/version.json）。
     // 手机浏览器常把标签页留存数日不刷新，旧代码会让视频继续走新标签页；
     // 已加载的旧页在切回可见时发现版本不一致就自动重载，之后不再有旧代码。
-    appVersion: '20261110-02', // 注意：与 assets/version.json 的 version 必须同步改，两处不一致时前台挂载即循环 reload（2026-11-04 -21 教训）
+    appVersion: '20261110-03', // 注意：与 assets/version.json 的 version 必须同步改，两处不一致时前台挂载即循环 reload（2026-11-04 -21 教训）
     // 播放器挂在 App 根节点，文件夹切换、前进后退、PDF 浮层都不卸载它。
     playerQueue: [],
     playerStartIndex: 0,
@@ -1494,6 +1494,10 @@ export default {
   background-size: cover;
   background-position: center;
   overflow-y: auto;
+  /* 到顶下拉不链到文档：否则 iOS Safari 会触发原生下拉刷新整页重载，
+     重载时工具栏展开（短视口）定下的布局在工具栏收起后不更新，
+     标题栏错位、底部留白，且只有重新访问才能复原。 */
+  overscroll-behavior: none;
   flex-direction: column;
   /* 音频条出现/消失时 padding 渐变，内容不跳。 */
   transition: padding-bottom 0.25s ease;

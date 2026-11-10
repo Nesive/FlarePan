@@ -10,6 +10,19 @@ html,
 body,
 #app {
   height: 100%;
+  /* iOS Safari：工具栏显隐会改变视口高度；100% 解析自加载时的视口，
+     工具栏收起后不更新，页面底部留白、sticky 标题栏错位。
+     dvh 跟随动态视口（工具栏显隐时高度实时跟上）。逐行回退：
+     不认 dvh 的用 vh，不认 vh 的用 100%。 */
+  height: 100vh;
+  height: 100dvh;
+}
+
+/* 下拉手势不链到文档：整页是定高应用壳，文档本身不应滚动；
+   到顶下拉若链到文档会触发浏览器原生下拉刷新（整页重载）。 */
+html,
+body {
+  overscroll-behavior: none;
 }
 
 button,
