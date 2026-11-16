@@ -17,6 +17,8 @@ const props = defineProps({
 });
 
 // 图标底色块：只按类型分色，不碰任何行为逻辑。
+// Google 原生文档（无二进制、导出后打开）：文档/表格/演示文稿/
+// 表单 → tile-doc，绘图 → tile-image（导出 PNG 后按图片打开）。
 const tileClass = computed(() => {
   const ct = props.contentType || '';
   if (['application/gzip', 'application/vnd.rar', 'application/zip'].includes(ct)) return 'tile-zip';
@@ -24,6 +26,13 @@ const tileClass = computed(() => {
   if (ct.startsWith('video/')) return 'tile-video';
   if (ct.startsWith('audio/')) return 'tile-audio';
   if (ct.startsWith('image/')) return 'tile-image';
+  if (ct === 'application/vnd.google-apps.drawing') return 'tile-image';
+  if ([
+    'application/vnd.google-apps.document',
+    'application/vnd.google-apps.spreadsheet',
+    'application/vnd.google-apps.presentation',
+    'application/vnd.google-apps.form',
+  ].includes(ct)) return 'tile-doc';
   if (ct.startsWith('text/') || ct.includes('json') || ct.includes('xml') || ct.includes('javascript')) return 'tile-doc';
   return 'tile-other';
 });

@@ -4,6 +4,7 @@ import { normalizeVideoContentType } from '@/utils/media-types';
 import {
   authRequiredResponseNoChallenge,
   canReadPath,
+  canTraversePath,
   configCorruptResponse,
   forbiddenResponse,
   getPermissionsConfig,
@@ -40,8 +41,12 @@ export async function onRequestGet(context) {
     const listPath = path || '';
     if (isProtectedPath(listPath, config.protected)) {
       if (!identity && !grant) return authRequiredResponseNoChallenge();
+      // A protected folder may also be listed when the caller can
+      // traverse it (a rule on a descendant): the listing itself only
+      // shows readable or traversable children.
       if (
         !canReadPath(listPath, identity, config.protected, rules) &&
+        !canTraversePath(listPath, identity, config.protected, rules) &&
         !shareGrantCovers(grant, listPath)
       ) {
         return forbiddenResponse();
@@ -102,6 +107,7 @@ export async function onRequestGet(context) {
         !folder.startsWith('_$transcode-jobs$/') &&
         (!isProtectedPath(folder, config.protected) ||
           canReadPath(folder, identity, config.protected, rules) ||
+          canTraversePath(folder, identity, config.protected, rules) ||
           shareGrantCovers(grant, folder))
     );
     if (!path)

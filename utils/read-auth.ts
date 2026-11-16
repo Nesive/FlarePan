@@ -469,6 +469,205 @@ export async function putShortenSettings(db, patch) {
   if (stmts.length) await db.batch(stmts);
 }
 
+// Mount providers (third-party drives mounted read-only, e.g. Google Drive).
+// Config lives in the D1 settings table (key `mount:<provider-id>`, JSON value).
+// No migration needed: the settings table already holds arbitrary key/value rows.
+// The Client Secret is server-side only; management endpoints must never serialize
+// it (they return hasSecret instead). The public providers endpoint only returns
+// the client_id + redirect_uri (public values the frontend needs to build the
+// authorization URL).
+
+export const MOUNT_PROVIDERS = [
+  {
+    id: 'google-drive',
+    name: 'Google Drive',
+    description: 'Google API (OAuth 2.0) 只读挂载。',
+    comingSoon: false,
+  },
+  {
+    id: 'onedrive',
+    name: 'OneDrive',
+    description: 'Microsoft Graph API (OAuth 2.0) 只读挂载。',
+    comingSoon: true,
+  },
+  {
+    id: 'dropbox',
+    name: 'Dropbox',
+    description: 'Dropbox API (OAuth 2.0) 只读挂载。',
+    comingSoon: true,
+  },
+];
+
+export const MOUNT_DRIVE_SCOPE = 'https://www.googleapis.com/auth/drive.readonly';
+
+export function mountSettingsKey(providerId) {
+  return 'mount:' + providerId;
+}
+
+export function isValidMountClientId(value) {
+  if (typeof value !== 'string') return false;
+  const v = value.trim();
+  return v !== '' && /^\S+\.apps\.googleusercontent\.com$/.test(v);
+}
+
+export function isValidMountRedirectUri(value) {
+  if (typeof value !== 'string') return false;
+  const v = value.trim();
+  if (v === '' || /\s/.test(v)) return false;
+  try {
+    const u = new URL(v);
+    return u.protocol === 'https:' && !!u.hostname && v.endsWith('/');
+  } catch {
+    return false;
+  }
+}
+
+// Reads one provider's config. No row = unconfigured (not corrupted).
+// A stored value that fails validation is reported as corrupted and treated
+// as unconfigured, never used. The returned secret is for server-side use
+// only; management endpoints must never serialize it (they return hasSecret).
+export async function getMountConfig(db, providerId) {
+  const empty = {
+    enabled: false,
+    clientId: '',
+    clientSecret: '',
+    redirectUri: '',
+    scopes: [],
+    hasSecret: false,
+    configured: false,
+    corrupted: false,
+  };
+  if (!db) return { ...empty, corrupted: true };
+  try {
+    const row = await db
+      .prepare('SELECT value FROM settings WHERE key = ?')
+      .bind(mountSettingsKey(providerId))
+      .first();
+    if (!row) return empty;
+    let cfg;
+    try {
+      cfg = JSON.parse(row.value);
+    } catch {
+      return { ...empty, corrupted: true };
+    }
+    if (!cfg || typeof cfg !== 'object' || Array.isArray(cfg)) {
+      return { ...empty, corrupted: true };
+    }
+    const clientId = typeof cfg.client_id === 'string' ? cfg.client_id.trim() : '';
+    const rawSecret = typeof cfg.client_secret === 'string' ? cfg.client_secret : '';
+    const redirectUri = typeof cfg.redirect_uri === 'string' ? cfg.redirect_uri.trim() : '';
+    const scopes = Array.isArray(cfg.scopes)
+      ? cfg.scopes.filter((s) => typeof s === 'string')
+      : [];
+    const enabled = cfg.enabled === true;
+    const idOk = clientId === '' || isValidMountClientId(clientId);
+    const uriOk = redirectUri === '' || isValidMountRedirectUri(redirectUri);
+    const corrupted = !idOk || !uriOk;
+    const configured = !corrupted && clientId !== '' && rawSecret !== '';
+    return {
+      enabled,
+      clientId: corrupted ? '' : clientId,
+      clientSecret: corrupted ? '' : rawSecret,
+      redirectUri: corrupted ? '' : redirectUri,
+      scopes,
+      hasSecret: rawSecret !== '',
+      configured,
+      corrupted,
+    };
+  } catch {
+    return { ...empty, corrupted: true };
+  }
+}
+
+// Partial update: undefined = preserve; '' for clientSecret = keep the stored
+// secret (never clear it to empty). Reads the raw stored row directly (not via
+// getMountConfig) so a kept secret survives even when the stored config is
+// corrupted. Callers validate before calling.
+export async function putMountConfig(db, providerId, patch) {
+  if (!db) throw new Error('no_db');
+  let stored = null;
+  try {
+    const row = await db
+      .prepare('SELECT value FROM settings WHERE key = ?')
+      .bind(mountSettingsKey(providerId))
+      .first();
+    if (row) {
+      try {
+        stored = JSON.parse(row.value);
+      } catch {
+        stored = null;
+      }
+    }
+  } catch {
+    stored = null;
+  }
+  const storedSecret =
+    stored && typeof stored.client_secret === 'string' ? stored.client_secret : '';
+  const storedClientId =
+    stored && typeof stored.client_id === 'string' ? stored.client_id.trim() : '';
+  const storedRedirectUri =
+    stored && typeof stored.redirect_uri === 'string' ? stored.redirect_uri.trim() : '';
+  const storedEnabled = stored ? stored.enabled === true : false;
+  const next = {
+    enabled: patch.enabled !== undefined ? !!patch.enabled : storedEnabled,
+    client_id: patch.clientId !== undefined ? patch.clientId : storedClientId,
+    client_secret:
+      patch.clientSecret !== undefined && patch.clientSecret !== ''
+        ? patch.clientSecret
+        : storedSecret,
+    redirect_uri: patch.redirectUri !== undefined ? patch.redirectUri : storedRedirectUri,
+    scopes: [MOUNT_DRIVE_SCOPE],
+  };
+  await db
+    .prepare(
+      'INSERT INTO settings (key, value) VALUES (?, ?) ON CONFLICT(key) DO UPDATE SET value = excluded.value'
+    )
+    .bind(mountSettingsKey(providerId), JSON.stringify(next))
+    .run();
+  return next;
+}
+
+// All providers with their config status (admin view; never includes the secret).
+export async function listMountProviders(db) {
+  const out = [];
+  for (const p of MOUNT_PROVIDERS) {
+    const cfg = await getMountConfig(db, p.id);
+    out.push({
+      id: p.id,
+      name: p.name,
+      description: p.description,
+      comingSoon: p.comingSoon,
+      enabled: cfg.enabled,
+      configured: cfg.configured,
+      corrupted: cfg.corrupted,
+      hasSecret: cfg.hasSecret,
+      clientId: cfg.clientId,
+      redirectUri: cfg.redirectUri,
+      scopes: cfg.scopes,
+    });
+  }
+  return out;
+}
+
+// Public providers: only enabled + configured ones, with the public values
+// the frontend needs to build the authorization URL (client_id + redirect_uri).
+// The secret is never included.
+export async function getPublicMountProviders(db) {
+  const out = [];
+  for (const p of MOUNT_PROVIDERS) {
+    if (p.comingSoon) continue;
+    const cfg = await getMountConfig(db, p.id);
+    if (!cfg.enabled || !cfg.configured) continue;
+    out.push({
+      id: p.id,
+      name: p.name,
+      client_id: cfg.clientId,
+      redirect_uri: cfg.redirectUri,
+    });
+  }
+  return out;
+}
+
 // Share links for protected folders (extraction-code shares).
 // Table: shares (slug, prefix, code_hash, created_by, created_at,
 // expires_at NULL=permanent, enabled, failed_attempts, locked_until;
@@ -928,6 +1127,58 @@ export function canWritePath(path, identity, rules) {
   if (identity.isAdmin) return true;
   const rule = longestRuleForUser(rules || [], identity.user, p);
   return !!rule && rule.access === 'write';
+}
+
+// Traverse check (listing / navigation only, never file content). A
+// protected folder is traversable when the caller can read it
+// directly, or holds a read/write rule covering any path under it.
+// Without this, a user whose rule sits on a deep folder can never
+// reach it: every ancestor is protected, canReadPath on the ancestor
+// finds no rule, so the ancestor is hidden from listings and answers
+// 403 on a direct PROPFIND/children call, and the user is stuck at
+// the root. Traverse grants no content access: a file under a
+// traversable folder still needs canReadPath (its own rule), and a
+// 'none' rule never makes a folder traversable. The listing itself
+// only ever shows readable or traversable children, so sibling
+// protected folders stay hidden.
+export function canTraversePath(path, identity, protectedList, rules) {
+  const p = (path || '').replace(/^\/+/, '');
+  if (!isProtectedPath(p, protectedList)) return true;
+  if (!identity) return false;
+  if (identity.isAdmin) return true;
+  if (canReadPath(p, identity, protectedList, rules)) return true;
+  const prefix = p.endsWith('/') ? p : p + '/';
+  return (rules || []).some((rule) => {
+    if (rule.user !== identity.user) return false;
+    if (rule.access !== 'read' && rule.access !== 'write') return false;
+    return rule.prefix.startsWith(prefix);
+  });
+}
+
+// Whether listing `path` would hide protected entries from an
+// unauthenticated caller. A direct-child folder of `path` is hidden
+// when it equals a protected prefix: anonymous callers can neither
+// read nor traverse it, so the listing silently drops it. When that
+// happens the DAV handler answers 401 instead of a filtered 207, so
+// challenge-response clients (iOS file managers, which send the first
+// request without credentials and only retry after a 401) learn they
+// must authenticate instead of silently showing only public folders.
+// This only fires for unauthenticated callers; an authenticated user
+// who simply lacks access to a sibling still gets the filtered 207.
+// It also only fires when a protected prefix is a direct child of
+// `path` — a purely public folder (no protected children) still lists
+// anonymously. (A path that is itself protected already 401s via the
+// access check, so it never reaches here.)
+export function listingHidesProtected(path, protectedList) {
+  const p = (path || '').replace(/^\/+/, '');
+  const prefix = p ? p + '/' : '';
+  return (protectedList || []).some((prot) => {
+    if (!prot.startsWith(prefix)) return false;
+    const rest = prot.slice(prefix.length);
+    if (!rest.endsWith('/')) return false;
+    const seg = rest.slice(0, -1);
+    return seg.length > 0 && !seg.includes('/');
+  });
 }
 
 export async function sha256Hex(text) {

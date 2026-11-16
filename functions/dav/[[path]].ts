@@ -28,6 +28,7 @@ import { resolveUploadContentType } from '@/utils/media-types';
 import {
   authRequiredResponse,
   canReadPath,
+  canTraversePath,
   canWritePath,
   configCorruptResponse,
   forbiddenResponse,
@@ -37,6 +38,7 @@ import {
   getReadIdentity,
   isDavDisabledIdentity,
   isProtectedPath,
+  listingHidesProtected,
 } from '@/utils/read-auth';
 
 const DAV_HEADERS = {
@@ -72,6 +74,19 @@ function davPathSegments(context) {
     }
   }
   return decoded;
+}
+
+// Whether the request presented credentials (a Basic Auth header or
+// a read-session cookie) that did not resolve to an identity. Such a
+// caller sent a wrong password or a stale session: answer 401 instead
+// of silently serving the anonymous view, or the client never learns
+// its credentials failed and shows only public content.
+function presentedCredentials(context) {
+  const auth = context.request.headers.get('Authorization') || '';
+  if (auth) return true;
+  const cookie = context.request.headers.get('Cookie') || '';
+  return cookie.split(';').some((part) =>
+    part.trim().startsWith('fd_read_session='));
 }
 
 async function listAll(bucket, prefix) {
@@ -210,6 +225,18 @@ rules) {
 
   // Collection self.
   responses.push(propXml(selfHref, displayName, 'collection', null));
+  // An unauthenticated PROPFIND (depth 1) on a folder whose listing
+  // would hide protected entries answers 401, not a filtered 207:
+  // challenge-response clients send the first request without
+  // credentials and only retry after a 401, so a silent filtered
+  // listing leaves them stuck on public folders forever.
+  if (
+    depth === 1 &&
+    !identity &&
+    listingHidesProtected(path, protectedList)
+  ) {
+    return authRequiredResponse();
+  }
   if (depth === 1) {
     const prefix = path ? `${path}/` : '';
     const { objects, folders } = await listDir(bucket, prefix);
@@ -232,9 +259,14 @@ rules) {
     for (const folder of folders) {
       if (hasFolderMarkerSegment(folder)) continue;
       if (folder.startsWith('_$flaredrive$/')) continue;
+      // A protected folder is listed when the caller can read it, or
+      // can traverse through it toward a descendant they hold a rule
+      // on (see canTraversePath). Files are never listed on traverse
+      // alone: they need a read rule of their own.
       if (
         isProtectedPath(folder, protectedList) &&
-        !canReadPath(folder, identity, protectedList, rules)
+        !canReadPath(folder, identity, protectedList, rules) &&
+        !canTraversePath(folder, identity, protectedList, rules)
       ) {
         continue;
       }
@@ -504,9 +536,17 @@ export async function onRequest(context) {
   const identity = await getReadIdentity(context, db);
 
   // An enabled account with davEnabled=false may not use DAV at all
-  // (401), even on public paths. Anonymous callers and bad credentials
-  // keep the old behavior: public reads work, protected reads 401.
+  // (401), even on public paths.
   if (method !== 'OPTIONS' && (await isDavDisabledIdentity(context, db))) {
+    return authRequiredResponse();
+  }
+
+  // Credentials were presented (Basic Auth header or session cookie)
+  // but did not resolve to an identity: the password is wrong or the
+  // session is stale. Answer 401 instead of silently serving the
+  // anonymous view, or the client never learns its credentials failed
+  // and shows only public content.
+  if (method !== 'OPTIONS' && !identity && presentedCredentials(context)) {
     return authRequiredResponse();
   }
 
@@ -523,7 +563,19 @@ export async function onRequest(context) {
     // A read-only rule allows reads, never writes.
     if (!identity) return authRequiredResponse();
     if (!canWritePath(path, identity, rules)) return forbiddenResponse();
-  } else if (['PROPFIND', 'GET', 'HEAD'].includes(method)) {
+  } else if (method === 'PROPFIND') {
+    // PROPFIND on a folder is also allowed when the caller can
+    // traverse it (a rule on a descendant): they may list it to
+    // navigate down. The listing itself only shows readable or
+    // traversable children. GET/HEAD stay read-only: traverse alone
+    // never serves file content.
+    if (
+      !canReadPath(path, identity, config.protected, rules) &&
+      !canTraversePath(path, identity, config.protected, rules)
+    ) {
+      return identity ? forbiddenResponse() : authRequiredResponse();
+    }
+  } else if (['GET', 'HEAD'].includes(method)) {
     if (!canReadPath(path, identity, config.protected, rules)) {
       return identity ? forbiddenResponse() : authRequiredResponse();
     }

@@ -33,39 +33,77 @@
         <span v-if="user" class="admin-who">当前账号：{{ user }}</span>
         <button @click="doLogout" class="admin-btn">退出</button>
       </div>
-      <nav class="admin-tabs">
-        <button
-          :class="{ on: tab === 'files' }"
-          @click="switchTab('files')">文件</button>
-        <button
-          :class="{ on: tab === 'protection' }"
-          @click="switchTab('protection')">受保护文件夹</button>
-        <button
-          :class="{ on: tab === 'shares' }"
-          @click="switchTab('shares')">分享</button>
-        <button
-          :class="{ on: tab === 'dav' }"
-          @click="switchTab('dav')">WebDAV</button>
-        <button
-          :class="{ on: tab === 'shorten' }"
-          @click="switchTab('shorten')">短链</button>
-        <button
-          :class="{ on: tab === 'accounts' }"
-          @click="switchTab('accounts')">账号</button>
-        <button
-          :class="{ on: tab === 'permissions' }"
-          @click="switchTab('permissions')">权限</button>
-        <button
-          :class="{ on: tab === 'limits' }"
-          @click="switchTab('limits')">上传限制</button>
-        <button
-          :class="{ on: tab === 'skin' }"
-          @click="switchTab('skin')">主题皮肤</button>
-      </nav>
-      <div v-if="globalError" class="admin-error">{{ globalError }}</div>
+      <div class="admin-layout">
+        <nav class="admin-sidebar">
+          <button class="admin-nav-item" :class="{ on: tab === 'overview' }" @click="switchTab('overview')">
+            <span class="admin-nav-label">概览</span>
+          </button>
+          <div v-for="group in navGroups" :key="group.id" class="admin-nav-group">
+            <div class="admin-nav-group-title">{{ group.label }}</div>
+            <button v-for="item in group.items" :key="item.id" class="admin-nav-item" :class="{ on: tab === item.id }" @click="switchTab(item.id)">
+              <span class="admin-nav-label">{{ item.label }}</span>
+              <span v-if="item.badge !== null && item.badge !== undefined" class="admin-nav-badge">{{ item.badge }}</span>
+            </button>
+          </div>
+          <div class="admin-nav-status">
+            <span class="admin-status-dot" :class="{ ok: overviewOk, bad: !!overviewError }"></span>
+            <span>{{ overviewStatusText }}</span>
+          </div>
+        </nav>
+        <main class="admin-main">
+          <div v-if="globalError" class="admin-error">{{ globalError }}</div>
 
-      <!-- 文件页 -->
-      <section v-if="tab === 'files'">
+          <!-- 概览页 -->
+          <section v-if="tab === 'overview'">
+            <h2>概览</h2>
+            <div v-if="overviewLoading">正在加载…</div>
+            <div v-else-if="overviewError" class="admin-error">{{ overviewError }} <button @click="loadOverview">重试</button></div>
+            <div v-else-if="overview">
+              <div class="admin-ov-grid">
+                <div class="admin-ov-card">
+                  <div class="admin-ov-num">{{ formatSize(overview.storage.totalBytes) }}</div>
+                  <div class="admin-ov-label">存储用量</div>
+                  <div v-if="overview.storage.totalMb" class="admin-ov-bar"><div class="admin-ov-bar-fill" :style="{ width: storagePct + '%' }"></div></div>
+                  <div v-else class="admin-ov-bar"><div class="admin-ov-bar-fill is-unlimited" title="不限量"></div></div>
+                  <div v-if="overview.storage.totalMb" class="admin-ov-sub">共 {{ formatSize(overview.storage.totalMb * 1024 * 1024) }} · 已用 {{ storagePct }}%</div>
+                  <div v-else class="admin-ov-sub">{{ overview.storage.fileCount }} 个对象 · 不限量</div>
+                </div>
+                <div class="admin-ov-card">
+                  <div class="admin-ov-num">{{ overview.shares.count }}</div>
+                  <div class="admin-ov-label">分享中</div>
+                  <div class="admin-ov-sub">{{ overview.shares.count ? '最近：' + (overview.shares.recent[0] ? overview.shares.recent[0].prefix : '') : '还没有分享' }}</div>
+                </div>
+                <div class="admin-ov-card">
+                  <div class="admin-ov-num">{{ overview.mounts.enabled.length }}</div>
+                  <div class="admin-ov-label">挂载</div>
+                  <div class="admin-ov-sub">{{ overview.mounts.enabled.length ? overview.mounts.enabled.map((p) => p.name).join('、') + ' 已配置' : '未配置第三方挂载' }}</div>
+                </div>
+                <div class="admin-ov-card">
+                  <div class="admin-ov-num">{{ overview.accounts.count }}</div>
+                  <div class="admin-ov-label">账号</div>
+                  <div class="admin-ov-sub">{{ overview.accounts.adminCount }} 个管理员</div>
+                </div>
+              </div>
+              <p class="admin-ov-sentence">{{ overviewSentence }}</p>
+              <h3 class="admin-ov-h3">最近动态</h3>
+              <ul class="admin-ov-activity">
+                <li v-for="a in overview.shares.recent" :key="a.slug">
+                  <span class="admin-ov-act-kind">分享</span>
+                  <span class="admin-ov-act-main">{{ a.prefix || '/' }}<span v-if="a.slug"> · {{ a.slug }}</span></span>
+                  <span class="admin-ov-act-time">{{ formatTime(a.createdAt) }}</span>
+                </li>
+                <li v-if="!overview.shares.recent || !overview.shares.recent.length" class="admin-ov-act-empty">暂无动态</li>
+              </ul>
+              <div class="admin-ov-actions">
+                <button class="admin-btn-primary" @click="switchTab('files')">上传文件</button>
+                <button class="admin-btn" @click="switchTab('shares')">新建分享</button>
+                <button class="admin-btn" @click="switchTab('mounts')">添加挂载</button>
+              </div>
+            </div>
+          </section>
+
+          <!-- 文件页 -->
+          <section v-if="tab === 'files'">
         <h2>文件</h2>
         <div class="admin-row">
           <span>当前目录：{{ cwd || "/" }}</span>
@@ -614,6 +652,53 @@ pass = &lt;你的密码&gt;</pre>
           <button @click="saveLimits" class="admin-btn-primary">保存</button>
         </div>
       </section>
+
+          <!-- 挂载页 -->
+          <section v-if="tab === 'mounts'">
+            <h2>挂载</h2>
+            <p class="admin-desc">第三方网盘挂载的 OAuth 配置存在这里。配好后，前台「添加挂载」里才会出现对应的入口；停用后入口消失，已绑的挂载不受影响。Client Secret 只保存在服务端，保存时留空表示不改。</p>
+            <div v-if="mountError" class="admin-error">{{ mountError }}</div>
+            <div v-if="mountOk" class="admin-ok">{{ mountOk }}</div>
+            <div class="admin-box">
+              <h3>Google Drive</h3>
+              <p class="admin-desc">用 Google OAuth2 连接，只读。重定向 URI 须与 Google Cloud Console 里填的一致（本站同源，含尾部斜杠）。</p>
+              <div class="admin-row">
+                <span class="admin-field-label">启用</span>
+                <input type="checkbox" v-model="mountGoogle.enabled" />
+                <span class="admin-desc">关掉后前台不再显示 Google Drive 入口</span>
+              </div>
+              <div class="admin-row">
+                <span class="admin-field-label">Client ID</span>
+                <input v-model="mountGoogle.clientId" placeholder="xxx.apps.googleusercontent.com" />
+              </div>
+              <div class="admin-row">
+                <span class="admin-field-label">Client Secret</span>
+                <input v-model="mountGoogle.clientSecret" type="password" placeholder="留空表示不改" />
+                <span v-if="mountGoogle.hasSecret" class="admin-desc">已配置</span>
+              </div>
+              <div class="admin-row">
+                <span class="admin-field-label">重定向 URI</span>
+                <input v-model="mountGoogle.redirectUri" placeholder="https://pan.nesive.com/" />
+              </div>
+              <div class="admin-row">
+                <span class="admin-field-label">作用域</span>
+                <span class="admin-scope" title="只读：授权时固定请求此作用域">{{ mountGoogle.scopes.length ? mountGoogle.scopes.join(', ') : 'https://www.googleapis.com/auth/drive.readonly（默认只读）' }}</span>
+              </div>
+              <div class="admin-row">
+                <button @click="saveMount('google-drive')" class="admin-btn-primary" :disabled="mountSaving">{{ mountSaving ? '保存中…' : '保存' }}</button>
+              </div>
+            </div>
+            <div class="admin-box">
+              <h3>OneDrive <span class="admin-coming">即将推出</span></h3>
+              <p class="admin-desc">OneDrive 挂载正在开发中，配置入口稍后开放。</p>
+            </div>
+            <div class="admin-box">
+              <h3>Dropbox <span class="admin-coming">即将推出</span></h3>
+              <p class="admin-desc">Dropbox 挂载正在开发中，配置入口稍后开放。</p>
+            </div>
+          </section>
+        </main>
+      </div>
     </div>
     <!-- 文件夹选择器：受保护增加、分享、规则、移动四处共用，单选，确认才写回 -->
     <div
@@ -702,13 +787,25 @@ export default {
   components: { MimeIcon, FolderIcon },
   data: () => ({
     view: 'login',
-    tab: 'files',
+    tab: 'overview',
     user: null,
     loginUser: '',
     loginPass: '',
     loginError: '',
     loginBusy: false,
     globalError: '',
+    // 概览（GET /api/admin/overview）：存储、分享、挂载、账号四个数
+    // + 最近动态；登录后默认落地页。
+    overview: null,
+    overviewLoading: false,
+    overviewError: '',
+    // 挂载（GET/POST /api/admin/mounts）：OAuth 配置。clientSecret
+    // 只在保存时发，留空表示不改；服务端只回 hasSecret，绝不回显。
+    mountGoogle: { enabled: false, clientId: '', clientSecret: '', redirectUri: '', scopes: [], hasSecret: false },
+    mountLoading: false,
+    mountSaving: false,
+    mountError: '',
+    mountOk: '',
     // 文件
     cwd: '',
     files: [],
@@ -827,6 +924,68 @@ export default {
   }),
 
   computed: {
+    // 侧栏四组：内容 / 连接 / 访问 / 系统。角标只给有明确数量的项
+    //（文件对象数、分享数、已启用挂载数、账号数），其余不显示。
+    navGroups() {
+      const o = this.overview;
+      return [
+        { id: 'content', label: '内容', items: [
+          { id: 'files', label: '文件', badge: o ? o.storage.fileCount : null },
+          { id: 'shares', label: '分享', badge: o ? o.shares.count : null },
+          { id: 'shorten', label: '短链', badge: null },
+        ] },
+        { id: 'connection', label: '连接', items: [
+          { id: 'dav', label: 'WebDAV', badge: null },
+          { id: 'mounts', label: '挂载', badge: o ? o.mounts.enabled.length : null },
+        ] },
+        { id: 'access', label: '访问', items: [
+          { id: 'accounts', label: '账号', badge: o ? o.accounts.count : null },
+          { id: 'permissions', label: '权限', badge: null },
+          { id: 'protection', label: '受保护文件夹', badge: null },
+        ] },
+        { id: 'system', label: '系统', items: [
+          { id: 'limits', label: '上传限制', badge: null },
+          { id: 'skin', label: '主题皮肤', badge: null },
+        ] },
+      ];
+    },
+
+    // 存储已用百分比（不限量时为 0）。
+    storagePct() {
+      const o = this.overview;
+      if (!o || !o.storage.totalMb) return 0;
+      const total = o.storage.totalMb * 1024 * 1024;
+      if (!total) return 0;
+      return Math.min(100, Math.round((o.storage.totalBytes / total) * 100));
+    },
+
+    // 概览一句话：最值得注意的那件事，优先报存储告急。
+    overviewSentence() {
+      const o = this.overview;
+      if (!o) return '';
+      if (o.storage.totalMb && this.storagePct >= 90) {
+        return '存储快满了（已用 ' + this.storagePct + '%），先清一清再传新文件。';
+      }
+      if (o.mounts.enabled.length) {
+        return o.mounts.enabled.map((p) => p.name).join('、') + ' 已接好，存储用了 ' + (o.storage.totalMb ? this.storagePct + '%' : '不限量') + '，一切正常。';
+      }
+      if (o.shares.count) {
+        return '有 ' + o.shares.count + ' 条分享在跑，存储用了 ' + (o.storage.totalMb ? this.storagePct + '%' : '不限量') + '。';
+      }
+      return '一切正常，存储' + (o.storage.totalMb ? '用了 ' + this.storagePct + '%' : '不限量') + '。';
+    },
+
+    // 侧栏底部状态行：绿点 = 服务正常。
+    overviewOk() {
+      return !!this.overview && !this.overviewError;
+    },
+    overviewStatusText() {
+      if (this.overviewLoading) return '正在加载…';
+      if (this.overviewError) return '服务异常';
+      if (this.overview) return '服务正常';
+      return '未加载';
+    },
+
     davAddr() {
       return window.location.origin + '/dav';
     },
@@ -979,8 +1138,8 @@ export default {
         this.user = data.user;
         this.loginPass = '';
         this.view = 'console';
-        this.tab = 'files';
-        this.fetchFilesAdmin();
+        this.tab = 'overview';
+        this.loadOverview();
       } catch (e) {
         this.loginError = '登录失败，请重试';
       } finally {
@@ -1034,6 +1193,7 @@ export default {
     switchTab(t) {
       this.tab = t;
       this.globalError = '';
+      if (t === 'overview') this.loadOverview();
       if (t === 'files') this.fetchFilesAdmin();
       if (t === 'protection') { this.loadProtection(); this.loadProtFolders(); }
       if (t === 'shares') this.loadShares();
@@ -1045,6 +1205,114 @@ export default {
         if (!this.users.length) this.loadAccounts();
       }
       if (t === 'limits') this.loadLimits();
+      if (t === 'mounts') this.loadMounts();
+    },
+
+    // 概览：四个数 + 最近动态（GET /api/admin/overview）。
+    async loadOverview() {
+      if (this.overviewLoading) return;
+      this.overviewLoading = true;
+      this.overviewError = '';
+      try {
+        const res = await fetch('/api/admin/overview');
+        if (res.status === 401) {
+          this.goLogin('登录已失效，请重新登录');
+          return;
+        }
+        const data = await this.readJson(res);
+        if (!res.ok) {
+          this.overviewError = '加载失败，请重试';
+          return;
+        }
+        this.overview = data;
+      } catch (e) {
+        this.overviewError = '加载失败，请重试';
+      } finally {
+        this.overviewLoading = false;
+      }
+    },
+
+    // 挂载配置：GET 全部提供商状态（Secret 只回 hasSecret）。
+    async loadMounts() {
+      if (this.mountLoading) return;
+      this.mountLoading = true;
+      this.mountError = '';
+      try {
+        const res = await fetch('/api/admin/mounts');
+        if (res.status === 401) {
+          this.goLogin('登录已失效，请重新登录');
+          return;
+        }
+        const data = await this.readJson(res);
+        if (!res.ok) {
+          this.mountError = '加载失败，请重试';
+          return;
+        }
+        const g = (data.providers || []).find((p) => p.id === 'google-drive');
+        if (g) {
+          this.mountGoogle = {
+            enabled: !!g.enabled,
+            clientId: g.clientId || '',
+            clientSecret: '',
+            redirectUri: g.redirectUri || '',
+            scopes: Array.isArray(g.scopes) ? g.scopes : [],
+            hasSecret: !!g.hasSecret,
+          };
+        }
+      } catch (e) {
+        this.mountError = '加载失败，请重试';
+      } finally {
+        this.mountLoading = false;
+      }
+    },
+
+    // 保存某提供商的挂载配置：Secret 留空表示保持现有值。
+    async saveMount(provider) {
+      this.mountError = '';
+      this.mountOk = '';
+      this.mountSaving = true;
+      try {
+        const body = { provider };
+        if (provider === 'google-drive') {
+          body.enabled = !!this.mountGoogle.enabled;
+          body.client_id = String(this.mountGoogle.clientId || '').trim();
+          body.client_secret = String(this.mountGoogle.clientSecret || '');
+          body.redirect_uri = String(this.mountGoogle.redirectUri || '').trim();
+        }
+        const res = await fetch('/api/admin/mounts', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify(body),
+        });
+        if (res.status === 401) {
+          this.goLogin('登录已失效，请重新登录');
+          return;
+        }
+        const data = await this.readJson(res);
+        if (!res.ok) {
+          this.mountError = (data && data.error) || '保存失败，请重试';
+          return;
+        }
+        if (provider === 'google-drive') {
+          this.mountGoogle.clientSecret = '';
+          this.mountGoogle.hasSecret = !!(data.provider && data.provider.hasSecret);
+        }
+        this.mountOk = '已保存';
+        // 配置变了，概览的挂载数也变了，下次进概览会重拉。
+        this.overview = null;
+      } catch (e) {
+        this.mountError = '保存失败，请重试';
+      } finally {
+        this.mountSaving = false;
+      }
+    },
+
+    // Unix 秒时间戳 → 本地「YYYY-MM-DD HH:mm」。
+    formatTime(ts) {
+      if (!ts) return '';
+      const d = new Date(ts * 1000);
+      const p = (n) => String(n).padStart(2, '0');
+      return d.getFullYear() + '-' + p(d.getMonth() + 1) + '-' + p(d.getDate()) + ' ' + p(d.getHours()) + ':' + p(d.getMinutes());
     },
 
     formatSize(size) {
@@ -3040,7 +3308,7 @@ export default {
   border-radius: 10px;
 }
 .admin-console {
-  max-width: 900px;
+  max-width: 1100px;
   margin: 0 auto;
   background: rgba(255, 255, 255, 0.65);
   backdrop-filter: blur(10px);
@@ -3062,32 +3330,225 @@ export default {
   font-size: 13px;
   color: dimgray;
 }
-.admin-tabs {
+/* 侧栏布局：左导航 + 右内容。 */
+.admin-layout {
   display: flex;
+  gap: 24px;
+  margin-top: 16px;
+  align-items: flex-start;
+}
+.admin-sidebar {
+  flex: 0 0 200px;
+  position: sticky;
+  top: 16px;
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+}
+.admin-nav-group {
+  margin-top: 14px;
+}
+.admin-nav-group-title {
+  font-size: 12px;
+  color: #8b949e;
+  letter-spacing: 0.08em;
+  padding: 0 12px 6px;
+}
+.admin-page .admin-nav-item {
+  display: flex;
+  align-items: center;
   gap: 8px;
-  margin: 16px 0 24px;
-  flex-wrap: wrap;
-  background: rgba(255, 255, 255, 0.5);
-  backdrop-filter: blur(10px);
-  border-radius: 50px;
-  padding: 6px;
-  box-shadow: 0 4px 8px rgba(0, 0, 0, 0.1);
-  width: fit-content;
-  max-width: 100%;
-}
-.admin-page .admin-tabs button {
-  padding: 8px 18px;
-  border-radius: 50px;
+  width: 100%;
+  text-align: left;
+  padding: 9px 12px;
+  border-radius: 10px;
   background: transparent;
+  color: #24292f;
+  font-size: 14px;
 }
-.admin-page .admin-tabs button:hover:not(.on) {
-  background: rgba(0, 0, 0, 0.06);
+.admin-page .admin-nav-item:hover:not(.on) {
+  background: rgba(0, 0, 0, 0.05);
 }
-.admin-page .admin-tabs button.on {
+.admin-page .admin-nav-item.on {
   background: rgb(57, 144, 155);
   color: #fff;
   font-weight: bold;
   box-shadow: 2px 4px 6px rgba(0, 0, 0, 0.3);
+}
+.admin-nav-label {
+  flex: 1;
+  min-width: 0;
+}
+.admin-nav-badge {
+  flex: none;
+  min-width: 20px;
+  text-align: center;
+  font-size: 12px;
+  line-height: 1.6;
+  padding: 0 6px;
+  border-radius: 999px;
+  background: rgba(0, 0, 0, 0.08);
+  color: #57606a;
+}
+.admin-nav-item.on .admin-nav-badge {
+  background: rgba(255, 255, 255, 0.25);
+  color: #fff;
+}
+/* 侧栏底部状态行：绿点自身闪烁（只有小点本身的透明度明暗，无扩散环）。 */
+.admin-nav-status {
+  margin-top: 18px;
+  padding: 12px 12px 4px;
+  border-top: 1px solid rgba(0, 0, 0, 0.08);
+  font-size: 13px;
+  color: #656d76;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+.admin-status-dot {
+  flex: none;
+  width: 8px;
+  height: 8px;
+  border-radius: 50%;
+  background: #8b949e;
+}
+.admin-status-dot.ok {
+  background: #3fb950;
+  animation: admin-dot-blink 1.6s ease-in-out infinite;
+}
+.admin-status-dot.bad {
+  background: #f85149;
+}
+@keyframes admin-dot-blink {
+  0%, 100% { opacity: 1; }
+  50% { opacity: 0.35; }
+}
+.admin-main {
+  flex: 1;
+  min-width: 0;
+}
+
+/* 概览页：四个数 + 一句话 + 最近动态 + 常用按钮。 */
+.admin-ov-grid {
+  display: grid;
+  grid-template-columns: repeat(4, 1fr);
+  gap: 12px;
+  margin: 16px 0;
+}
+.admin-ov-card {
+  background: rgba(255, 255, 255, 0.75);
+  border-radius: 10px;
+  padding: 14px 16px;
+}
+.admin-ov-num {
+  font-size: 24px;
+  font-weight: bold;
+  line-height: 1.2;
+}
+.admin-ov-label {
+  font-size: 13px;
+  color: #656d76;
+  margin-top: 2px;
+}
+.admin-ov-sub {
+  font-size: 12px;
+  color: #8b949e;
+  margin-top: 6px;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+.admin-ov-bar {
+  height: 6px;
+  border-radius: 999px;
+  background: rgba(0, 0, 0, 0.08);
+  margin-top: 10px;
+  overflow: hidden;
+}
+.admin-ov-bar-fill {
+  height: 100%;
+  border-radius: 999px;
+  background: rgb(57, 144, 155);
+}
+/* 不限量时进度条常显：斜纹填充表示“无上限”，与百分比实心填充区分。 */
+.admin-ov-bar-fill.is-unlimited {
+  width: 100%;
+  background: repeating-linear-gradient(45deg, rgba(57, 144, 155, 0.28) 0 6px, rgba(57, 144, 155, 0.08) 6px 12px);
+}
+.admin-ov-sentence {
+  font-size: 14px;
+  color: #24292f;
+  margin: 4px 0 20px;
+}
+.admin-ov-h3 {
+  font-size: 15px;
+  margin: 0 0 8px;
+}
+.admin-ov-activity {
+  list-style: none;
+  margin: 0 0 20px;
+  padding: 0;
+}
+.admin-ov-activity li {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 9px 2px;
+  border-bottom: 1px solid rgba(0, 0, 0, 0.06);
+  font-size: 14px;
+}
+.admin-ov-act-kind {
+  flex: none;
+  font-size: 12px;
+  color: #656d76;
+  background: rgba(0, 0, 0, 0.05);
+  border-radius: 999px;
+  padding: 2px 8px;
+}
+.admin-ov-act-main {
+  flex: 1;
+  min-width: 0;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+.admin-ov-act-time {
+  flex: none;
+  font-size: 12px;
+  color: #8b949e;
+}
+.admin-ov-act-empty {
+  color: #8b949e;
+}
+.admin-ov-actions {
+  display: flex;
+  gap: 10px;
+  flex-wrap: wrap;
+}
+
+/* 挂载页表单：标签定宽，输入框自适应。 */
+.admin-field-label {
+  min-width: 100px;
+  font-size: 14px;
+  color: #333;
+}
+/* 作用域只读显示：等宽字、允许长 URL 换行，不可编辑。 */
+.admin-scope {
+  font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
+  font-size: 12px;
+  color: #57606a;
+  word-break: break-all;
+  flex: 1;
+  min-width: 0;
+}
+.admin-coming {
+  font-size: 12px;
+  font-weight: normal;
+  color: #8b949e;
+  background: rgba(0, 0, 0, 0.05);
+  border-radius: 999px;
+  padding: 2px 8px;
+  vertical-align: middle;
 }
 .admin-console section h2 {
   font-size: 18px;
@@ -3478,6 +3939,41 @@ export default {
   /* 上传限制卡片窄屏单列 */
   .admin-limit-grid {
     grid-template-columns: 1fr;
+  }
+  /* 窄屏下侧栏收成顶部横向滚动导航 */
+  .admin-layout {
+    flex-direction: column;
+    gap: 12px;
+  }
+  .admin-sidebar {
+    flex: none;
+    position: static;
+    width: 100%;
+    flex-direction: row;
+    align-items: center;
+    gap: 6px;
+    overflow-x: auto;
+    padding-bottom: 4px;
+    scrollbar-width: none;
+  }
+  .admin-sidebar::-webkit-scrollbar {
+    display: none;
+  }
+  .admin-sidebar .admin-nav-group {
+    display: contents;
+  }
+  .admin-sidebar .admin-nav-group-title,
+  .admin-sidebar .admin-nav-status {
+    display: none;
+  }
+  .admin-page .admin-nav-item {
+    flex: none;
+    width: auto;
+    white-space: nowrap;
+  }
+  /* 概览卡片窄屏两列 */
+  .admin-ov-grid {
+    grid-template-columns: repeat(2, 1fr);
   }
 }
 

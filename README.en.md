@@ -47,6 +47,33 @@ Feature demo video (cut from real screenshots, 94s): [pan-demo.mp4](screenshots/
 
 Mobile is fully featured too: search, folders, file lists and viewers all work, and both themes switch the same way on phones.
 
+### New in v20261116-07
+
+The create entry moved into the list header: a glass "+ New" button on the right opens a two-item menu with icons and hints (Upload file / New folder); "+" rotates 45° into "×", and clicking outside or pressing Esc closes it; on phones only the "+" circle remains. The overview storage card now shows a striped progress bar even when unlimited, and the mounts page Google Drive card gained a read-only "Scopes" row. Share links with an access code open in one click (`?code=` auto-unlock), and audio no longer gets refused by browsers over `Content-Type`. Third-party drive mounts added (WebDAV and Google Drive, configured in admin, stored in D1).
+
+### New in v20261116-07
+
+The create entry moved into the list header: a glass "+ New" button on the right opens a two-item menu with icons and hints (Upload file / New folder); "+" rotates 45° into "×", and clicking outside or pressing Esc closes it; on phones only the "+" circle remains. The overview storage card now shows a striped progress bar even when unlimited, and the mounts page Google Drive card gained a read-only "Scopes" row. Share links with an access code open in one click (`?code=` auto-unlock), and audio no longer gets refused by browsers over `Content-Type`.
+
+<table>
+  <tr>
+    <td><img src="screenshots/create-menu-original-flarepan.png" alt="Create menu (Original)" width="360"></td>
+    <td><img src="screenshots/create-menu-starship-flarepan.png" alt="Create menu (Starship)" width="360"></td>
+  </tr>
+  <tr>
+    <td align="center">Create menu (Original)</td>
+    <td align="center">Create menu (Starship)</td>
+  </tr>
+  <tr>
+    <td><img src="screenshots/overview-storage-bar-flarepan.png" alt="Overview striped storage bar" width="360"></td>
+    <td><img src="screenshots/mounts-drive-scopes-flarepan.png" alt="Mounts Drive scopes row" width="360"></td>
+  </tr>
+  <tr>
+    <td align="center">Overview striped storage bar</td>
+    <td align="center">Mounts Drive scopes row</td>
+  </tr>
+</table>
+
 ![Tab planet favicon](screenshots/favicon-tab-flarepan.png)
 
 The favicon follows the skin: a transparent planet icon with no white or square background on the browser tab.

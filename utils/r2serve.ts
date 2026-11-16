@@ -3,7 +3,10 @@
 // are served as a plain 200 (R2 cannot serve multipart ranges).
 
 import { notFound } from '@/utils/bucket';
-import { normalizeVideoContentType } from '@/utils/media-types';
+import {
+  normalizeAudioContentType,
+  normalizeVideoContentType,
+} from '@/utils/media-types';
 
 function parseRange(header, size) {
   if (!header || !header.startsWith('bytes=')) return null;
@@ -64,15 +67,21 @@ export async function serveR2Object(context, bucket, key, extraHeaders) {
   // octet-stream 响应会被浏览器沿用数天）；前端视频 URL 另带 ?play=1
   // 换缓存键，绕过已有的旧缓存条目。
   const normalizedVideoType = normalizeVideoContentType(key, storedType);
+  // 音频：历史上传常缺 contentType，存成 octet-stream；<audio> 不接受
+  // octet-stream（且生产响应禁嗅探），会直接拒绝播放、退到下载。存量
+  // 类型未知时按扩展名补一个真正的音频类型，并加 no-cache（同 PDF/
+  // 视频案：已缓存的旧 octet-stream 响应会被浏览器沿用数天）。
+  const normalizedAudioType = normalizeAudioContentType(key, storedType);
   const contentType = isPdf
     ? 'application/pdf'
-    : normalizedVideoType || storedType || 'application/octet-stream';
+    : normalizedVideoType || normalizedAudioType || storedType
+      || 'application/octet-stream';
   headers.set('Content-Type', contentType);
   if (isPdf) {
     headers.set('Content-Disposition', 'inline');
     headers.set('Cache-Control', 'no-cache');
   }
-  if (normalizedVideoType) {
+  if (normalizedVideoType || normalizedAudioType) {
     headers.set('Cache-Control', 'no-cache');
   }
   headers.set('Accept-Ranges', 'bytes');

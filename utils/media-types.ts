@@ -161,3 +161,31 @@ export function normalizeVideoContentType(key, storedType) {
   if (dot < 0) return null;
   return VIDEO_CONTENT_TYPES[key.slice(dot + 1).toLowerCase()] || null;
 }
+
+// Extension -> Content-Type for audio files, shared by /raw/ serving
+// (utils/r2serve.ts). Mirrors VIDEO_CONTENT_TYPES: only fills in a
+// type when the stored one is missing or application/octet-stream; a
+// real stored type is never overridden. Values match the audio entries
+// in CONTENT_TYPES_BY_EXTENSION above. (Sunday recordings uploaded
+// without a Content-Type land in R2 as octet-stream; with nosniff the
+// browser refuses to play them, so the read side must normalize.)
+export const AUDIO_CONTENT_TYPES = {
+  mp3: 'audio/mpeg',
+  wav: 'audio/wav',
+  ogg: 'audio/ogg',
+  oga: 'audio/ogg',
+  m4a: 'audio/mp4',
+  flac: 'audio/flac',
+  aac: 'audio/aac',
+  opus: 'audio/opus',
+};
+
+// Returns the audio Content-Type for key when the stored type is
+// unknown, or null when the stored type should be kept as-is.
+export function normalizeAudioContentType(key, storedType) {
+  const type = (storedType || '').trim();
+  if (type && type !== 'application/octet-stream') return null;
+  const dot = key.lastIndexOf('.');
+  if (dot < 0) return null;
+  return AUDIO_CONTENT_TYPES[key.slice(dot + 1).toLowerCase()] || null;
+}

@@ -6,7 +6,8 @@
       <div class="info-meta">{{ file.sizeText }} · {{ file.type || '未知类型' }}</div>
       <div class="info-note">{{ note }}</div>
       <div class="info-actions">
-        <a class="info-btn" :href="file.url" download>下载</a>
+        <a v-if="file.webViewLink" class="info-btn" :href="file.webViewLink" target="_blank" rel="noopener">在 Google Drive 中打开</a>
+        <a v-if="!file.noDownload" class="info-btn" :href="file.url" download>下载</a>
         <button class="info-btn" @click="$emit('close')">关闭</button>
       </div>
     </div>
@@ -33,6 +34,11 @@ export default {
 
   computed: {
     note() {
+      // Google 原生文档（表单等无导出格式）：站内无法下载/预览，
+      // 请去 Google Drive 打开。
+      if (this.file.noDownload) {
+        return '这是 Google 原生文件，无法直接下载或站内预览，请在 Google Drive 中打开。';
+      }
       const ext = (this.file.name.split('.').pop() || '').toLowerCase();
       if (['doc', 'docx', 'xls', 'xlsx', 'ppt', 'pptx', 'odt', 'ods', 'odp', 'pages', 'numbers', 'key'].includes(ext)) {
         return 'Office 文档暂不支持站内渲染，可下载后查看。';
