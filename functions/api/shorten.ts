@@ -12,6 +12,8 @@
 // "/?p=App/Zoom/" }
 //           or { "target": "/s/<share-slug>" }
 //           or { "target": "/s/<share-slug>?code=<code>" }
+//           or { "target": "/s/<share-slug>?code=<code>&file=<name>" }
+//             （v22：同一分享页直达指定文件；file 只取文件名）
 // Response: { "shortLink": "https://short.example/<slug>", "slug", "target",
 // "status" }
 //
@@ -94,21 +96,32 @@ function normalizeTarget(target, origin) {
       const qIndex = rest.indexOf('?');
       const slug = qIndex === -1 ? rest : rest.slice(0, qIndex);
       if (!slug || !/^[A-Za-z0-9_-]{1,64}$/.test(slug)) return null;
-      // 带提取码的短链：目标可带唯一的 ?code= 参数（分享结果框里
-      // 一键复制用）；其他查询参数一律拒绝，避免短链指向未预期的地址。
+      // 带提取码的短链：目标可带 ?code= 参数（分享结果框里一键复制用）；
+      // v22 再加可选的 ?file=<文件名>（主日三短链：同一分享页直达指定
+      // 文件，验码后自动打开一次）；除 code/file 外的其他查询参数一律
+      // 拒绝，避免短链指向未预期的地址。
       let code = null;
+      let file = null;
       if (qIndex !== -1) {
         const params = new URLSearchParams(rest.slice(qIndex + 1));
         const keys = [...params.keys()];
-        if (keys.length !== 1 || keys[0] !== 'code') return null;
+        if (keys.length < 1 || keys.length > 2 || keys[0] !== 'code'
+            || (keys.length === 2 && keys[1] !== 'file')) return null;
         code = params.get('code');
         if (!code || !/^[A-Za-z0-9]{1,64}$/.test(code)) return null;
+        if (keys.length === 2) {
+          file = params.get('file');
+          // 只取文件名：不含 /、\ 与 ..，不出分享文件夹。
+          if (!file || file.includes('/') || file.includes('\\')
+              || file.includes('..')) return null;
+        }
       }
       // 分享页本身凭提取码鉴权；短链只是重定向，不授予任何访问，
       // 因此不设 protectedPath（与文件目标不同）。
       return {
         url: code
           ? `${origin}/s/${slug}?code=${encodeURIComponent(code)}`
+            + (file ? `&file=${encodeURIComponent(file)}` : '')
           : `${origin}/s/${slug}`,
         protectedPath: '',
         shareSlug: slug,
