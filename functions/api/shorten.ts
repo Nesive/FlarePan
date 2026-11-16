@@ -14,6 +14,12 @@
 //           or { "target": "/s/<share-slug>?code=<code>" }
 //           or { "target": "/s/<share-slug>?code=<code>&file=<name>" }
 //             （v22：同一分享页直达指定文件；file 只取文件名）
+// Optional labelling (v23): { "tag": "主日" } or { "tags": ["主日"] }
+// and { "comment": "第3讲【…】-William.mp3 · FlarePan" } are passed
+// through to Sink's upsert as tags/comment. A single tag is normalized
+// to a one-element tags array; both tag and tags may be given and are
+// merged (deduped). Absent tag/tags/comment leaves the old
+// { url, slug } upsert untouched, so existing callers are unaffected.
 // Response: { "shortLink": "https://short.example/<slug>", "slug", "target",
 // "status" }
 //
@@ -66,6 +72,51 @@ function json(body, status) {
 
 function encodeKey(key) {
   return key.split('/').map((s) => encodeURIComponent(s)).join('/');
+}
+
+// Validates the optional v23 labelling fields against Sink's
+// CreateLinkSchema (tags: ≤10, each 1–32 chars after trim/lowercase;
+// comment: ≤2048 chars). Returns { tags, comment } with absent fields
+// left undefined, or { error } for a 400. Validating here fails fast
+// instead of surfacing a bad value as a Sink 502; Sink itself also
+// trims, lowercases and dedupes tags on receipt.
+function parseTagComment(body) {
+  const rawTags = [];
+  if (body.tag !== undefined) {
+    if (typeof body.tag !== 'string') return { error: 'invalid_tags' };
+    rawTags.push(body.tag);
+  }
+  if (body.tags !== undefined) {
+    if (!Array.isArray(body.tags)
+        || body.tags.some((t) => typeof t !== 'string')) {
+      return { error: 'invalid_tags' };
+    }
+    rawTags.push(...body.tags);
+  }
+  let tags;
+  if (rawTags.length) {
+    const seen = new Set();
+    tags = [];
+    for (const t of rawTags) {
+      const norm = t.trim().toLowerCase();
+      if (!norm || norm.length > 32) return { error: 'invalid_tags' };
+      if (!seen.has(norm)) {
+        seen.add(norm);
+        tags.push(norm);
+      }
+    }
+    if (tags.length > 10) return { error: 'invalid_tags' };
+  }
+  let comment;
+  if (body.comment !== undefined) {
+    if (typeof body.comment !== 'string') {
+      return { error: 'invalid_comment' };
+    }
+    comment = body.comment.trim();
+    if (comment.length > 2048) return { error: 'invalid_comment' };
+    if (!comment) comment = undefined;
+  }
+  return { tags, comment };
 }
 
 // Normalizes a client-supplied target into an absolute same-site URL and
@@ -204,6 +255,12 @@ export async function onRequest(context) {
   if (!normalized) {
     return json({ error: 'invalid_target' }, 400);
   }
+  // Optional v23 labelling: validated now, passed through to Sink's
+  // upsert below. Absent tag/tags/comment keeps old behaviour exactly.
+  const meta = parseTagComment(body || {});
+  if (meta.error) {
+    return json({ error: meta.error }, 400);
+  }
 
   // Protected targets need an authenticated caller with access first,
   // otherwise the short link itself becomes a bypass.
@@ -253,6 +310,13 @@ export async function onRequest(context) {
   }
 
   const slug = await deterministicSlug(normalized.url);
+  // Tag/comment passthrough (v23): only sent when the caller supplied
+  // them, so existing callers get the exact old { url, slug } upsert.
+  // Note: when the slug already exists Sink returns the stored link
+  // unchanged, so tags/comment only land on freshly created links.
+  const upsertBody = { url: normalized.url, slug };
+  if (meta.tags) upsertBody.tags = meta.tags;
+  if (meta.comment !== undefined) upsertBody.comment = meta.comment;
   let sinkRes;
   try {
     sinkRes = await fetch(`${base}/api/link/upsert`, {
@@ -267,7 +331,7 @@ export async function onRequest(context) {
         'User-Agent':
           'Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/131.0.0.0 Safari/537.36',
       },
-      body: JSON.stringify({ url: normalized.url, slug }),
+      body: JSON.stringify(upsertBody),
       signal: AbortSignal.timeout(10000),
     });
   } catch {
