@@ -47,6 +47,10 @@ Feature demo video (cut from real screenshots, 94s): [pan-demo.mp4](screenshots/
 
 Mobile is fully featured too: search, folders, file lists and viewers all work, and both themes switch the same way on phones.
 
+### New in v20261116-08
+
+Share links gained a `?file=<filename>` deep link: once the access code is verified and the file list loads, the named file opens automatically, once (PDF in the built-in viewer, audio in the built-in player). If the file is not in the shared folder, the folder list shows normally with no error. `?file=` takes only a file name and never leaves the shared folder; it works on the same link as the `?code=` auto-unlock.
+
 ### New in v20261116-07
 
 The create entry moved into the list header: a glass "+ New" button on the right opens a two-item menu with icons and hints (Upload file / New folder); "+" rotates 45° into "×", and clicking outside or pressing Esc closes it; on phones only the "+" circle remains. The overview storage card now shows a striped progress bar even when unlimited, and the mounts page Google Drive card gained a read-only "Scopes" row. Share links with an access code open in one click (`?code=` auto-unlock), and audio no longer gets refused by browsers over `Content-Type`. Third-party drive mounts added (WebDAV and Google Drive, configured in admin, stored in D1).
