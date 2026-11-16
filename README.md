@@ -48,6 +48,25 @@ DAV 可用 demo 账号登录，写权限在 `demo/` 目录下。
 
 新建入口收进列表头：右端一枚玻璃「＋ 新建」按钮，点开是带图标与说明的两项菜单（上传文件 / 新建文件夹），「＋」转 45° 变「×」，点外或按 Esc 关闭；手机上只剩「＋」圆钮。管理后台概览的存储卡在不限量时也显示斜纹进度条；挂载页 Google Drive 配置卡多了只读的「作用域」行。分享链接带提取码时一点即进（`?code=` 自动解锁），音频不再因 `Content-Type` 被浏览器拒播。新增第三方网盘挂载（WebDAV 与 Google Drive，管理后台配置、D1 存储）。
 
+<table>
+  <tr>
+    <td><img src="screenshots/create-menu-original-flarepan.png" alt="新建菜单（原始主题）" width="360"></td>
+    <td><img src="screenshots/create-menu-starship-flarepan.png" alt="新建菜单（星际主题）" width="360"></td>
+  </tr>
+  <tr>
+    <td align="center">新建菜单（原始主题）</td>
+    <td align="center">新建菜单（星际主题）</td>
+  </tr>
+  <tr>
+    <td><img src="screenshots/overview-storage-bar-flarepan.png" alt="概览斜纹存储条" width="360"></td>
+    <td><img src="screenshots/mounts-drive-scopes-flarepan.png" alt="挂载页 Drive 作用域行" width="360"></td>
+  </tr>
+  <tr>
+    <td align="center">概览斜纹存储条</td>
+    <td align="center">挂载页 Drive 作用域行</td>
+  </tr>
+</table>
+
 ![页签星球 favicon](screenshots/favicon-tab-flarepan.png)
 
 换肤即换图标：星球 favicon 为透明底，浏览器页签上无白底无方底。

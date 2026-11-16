@@ -51,10 +51,6 @@ Mobile is fully featured too: search, folders, file lists and viewers all work, 
 
 The create entry moved into the list header: a glass "+ New" button on the right opens a two-item menu with icons and hints (Upload file / New folder); "+" rotates 45° into "×", and clicking outside or pressing Esc closes it; on phones only the "+" circle remains. The overview storage card now shows a striped progress bar even when unlimited, and the mounts page Google Drive card gained a read-only "Scopes" row. Share links with an access code open in one click (`?code=` auto-unlock), and audio no longer gets refused by browsers over `Content-Type`. Third-party drive mounts added (WebDAV and Google Drive, configured in admin, stored in D1).
 
-### New in v20261116-07
-
-The create entry moved into the list header: a glass "+ New" button on the right opens a two-item menu with icons and hints (Upload file / New folder); "+" rotates 45° into "×", and clicking outside or pressing Esc closes it; on phones only the "+" circle remains. The overview storage card now shows a striped progress bar even when unlimited, and the mounts page Google Drive card gained a read-only "Scopes" row. Share links with an access code open in one click (`?code=` auto-unlock), and audio no longer gets refused by browsers over `Content-Type`.
-
 <table>
   <tr>
     <td><img src="screenshots/create-menu-original-flarepan.png" alt="Create menu (Original)" width="360"></td>
