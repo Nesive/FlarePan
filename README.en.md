@@ -47,6 +47,10 @@ Feature demo video (cut from real screenshots, 94s): [pan-demo.mp4](screenshots/
 
 Mobile is fully featured too: search, folders, file lists and viewers all work, and both themes switch the same way on phones.
 
+### New in v20261116-10
+
+Single-file shares: a share prefix can be a full file path (e.g. one lecture's PDF handout or MP3 recording); the share page lists exactly that file, and clicking it opens the built-in viewer / player. Folder shares are unaffected.
+
 ### New in v20261116-08
 
 Share links gained a `?file=<filename>` deep link: once the access code is verified and the file list loads, the named file opens automatically, once (PDF in the built-in viewer, audio in the built-in player). If the file is not in the shared folder, the folder list shows normally with no error. `?file=` takes only a file name and never leaves the shared folder; it works on the same link as the `?code=` auto-unlock.

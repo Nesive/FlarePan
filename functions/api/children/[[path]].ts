@@ -39,6 +39,47 @@ export async function onRequestGet(context) {
     // this helper), so shares are web-only by construction.
     const grant = await verifyShareGrant(context, db);
     const listPath = path || '';
+    // Single-file share (v23 Sunday: share prefix is a full file key,
+    // e.g. "Sermons/.../第4讲-William.pdf"). cleanShareRow normalizes
+    // every prefix with a trailing "/", so the grant prefix reads as
+    // "<file>/"; the normal listing below (prefix = path + "/") would
+    // then list under "<file>/" and come back empty. When the
+    // requested path IS the share root and that key exists as an
+    // object, return it as the only file so the share page shows
+    // exactly that file (click opens the viewer/player). Folder
+    // shares are unaffected: head() of a folder path returns null
+    // and execution falls through to the normal listing.
+    if (grant && listPath) {
+      const grantRoot = grant.prefix.replace(/\/+$/, '');
+      if (listPath === grantRoot) {
+        const head = await bucket.head(listPath);
+        if (head) {
+          const storedType =
+            (head.httpMetadata && head.httpMetadata.contentType) || '';
+          const normalizedVideoType = normalizeVideoContentType(
+            listPath,
+            storedType
+          );
+          return new Response(
+            JSON.stringify({
+              value: [
+                {
+                  key: listPath,
+                  size: head.size,
+                  uploaded: head.uploaded,
+                  httpMetadata: normalizedVideoType
+                    ? { ...head.httpMetadata, contentType: normalizedVideoType }
+                    : head.httpMetadata,
+                  customMetadata: head.customMetadata,
+                },
+              ],
+              folders: [],
+            }),
+            { headers: { 'Content-Type': 'application/json' } }
+          );
+        }
+      }
+    }
     if (isProtectedPath(listPath, config.protected)) {
       if (!identity && !grant) return authRequiredResponseNoChallenge();
       // A protected folder may also be listed when the caller can
