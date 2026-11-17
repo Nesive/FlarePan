@@ -1018,13 +1018,10 @@ export default {
     shareError: '',
     shareBusy: false,
     shareRoot: '',
-    // 分享 ?file= 直达（v22）：验码通过、列表加载完成后自动打开一次；
-    // 打开过（或找不到文件）即置 true，不再重复触发。
-    shareFileOpened: false,
     // 前端版本戳：每次部署同步 bump（见 assets/version.json）。
     // 手机浏览器常把标签页留存数日不刷新，旧代码会让视频继续走新标签页；
     // 已加载的旧页在切回可见时发现版本不一致就自动重载，之后不再有旧代码。
-    appVersion: '20261116-10', // 注意：与 assets/version.json 的 version 必须同步改，两处不一致时前台挂载即循环 reload（2026-11-04 -21 教训）
+    appVersion: '20261116-11', // 注意：与 assets/version.json 的 version 必须同步改，两处不一致时前台挂载即循环 reload（2026-11-04 -21 教训）
     // 播放器挂在 App 根节点，文件夹切换、前进后退、PDF 浮层都不卸载它。
     playerQueue: [],
     playerStartIndex: 0,
@@ -1749,30 +1746,6 @@ export default {
       }
     },
 
-    // 分享 ?file= 直达（v22）：验码通过、列表加载完成后，若 ?file= 指
-    // 名的文件在当前分享文件夹列表里，只自动打开一次（调现有 openFile，
-    // 走已验通的 PDF 查看器/音频播放器）；找不到则正常显示文件夹列表。
-    // ?file= 只取文件名，不出分享文件夹；OAuth 回调不碰该参数
-    // （handleDriveCallback 只在真有待处理 Drive OAuth 时才接手 URL）。
-    maybeOpenSharedFile() {
-      if (!this.shareMode || this.shareState !== 'ready'
-          || this.shareFileOpened) return;
-      let name = '';
-      try {
-        name = new URL(window.location).searchParams.get('file') || '';
-      } catch (e) { name = ''; }
-      name = (name || '').trim();
-      if (!name) return;
-      this.shareFileOpened = true;
-      const file = (this.files || []).find((f) => {
-        const key = (f && f.key) || '';
-        const base = key.split('/').pop() || '';
-        return base === name || (f && f.name) === name;
-      });
-      if (!file) return;
-      this.$nextTick(() => this.openFile(file));
-    },
-
     // 列表切换淡入：class 去掉 → 强制 reflow → 加回，动画重播一次。
     // 只在文件夹导航渲染后调用（搜索/排序不走 fetchFiles，不误触发）。
     animateList() {
@@ -1872,7 +1845,6 @@ export default {
           this.loading = false;
           this.navLoading = false;
           this.animateList();
-          this.maybeOpenSharedFile();
         })
         .catch(() => {
           if (seq !== this.fetchSeq) return;
