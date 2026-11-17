@@ -47,6 +47,10 @@ Feature demo video (cut from real screenshots, 94s): [pan-demo.mp4](screenshots/
 
 Mobile is fully featured too: search, folders, file lists and viewers all work, and both themes switch the same way on phones.
 
+### New in v20261117-14
+
+Admin Files page: each folder row gains a red Delete button. Clicking it first previews the deletion (counts only, deletes nothing), then opens a custom confirmation dialog — red warning header, folder name, object count and "cannot be undone", plus any associated shares / permission rules / protected subfolders; confirming deletes recursively and the folder vanishes from the list at once. Protected folders refuse deletion (unprotect them first on the Protected folders page). The admin Overview's storage stats now come from a D1 cache (15 minutes), so repeat opens take about 2 seconds.
+
 ### New in v20261116-11
 
 Removed the `?file=<filename>` deep link (added in v20261116-08): single-file shares (v20261116-10) supersede it — each file gets its own share that opens directly in the viewer / player. Old links carrying `?file=` now open the share folder page instead of auto-opening the file; new share links are unaffected.
