@@ -132,6 +132,9 @@
             <div class="admin-file-actions">
               <button v-if="shortenEnabled" @click="copyShortLink('/?p=' + encodeURIComponent(f))">复制短链</button>
               <button @click="renameFolder(f)">改名</button>
+              <button
+                @click="deleteFolder(f)"
+                class="admin-danger">删除</button>
             </div>
           </li>
           <li v-for="file in files" :key="file.key" class="admin-file-row">
@@ -770,6 +773,38 @@ pass = &lt;你的密码&gt;</pre>
         </div>
       </div>
     </div>
+    <!-- 删除文件夹确认框：自定义弹窗替代原生 window.confirm。
+         原生确认框在各浏览器长相不一、且无法展示对象数与关联项，
+         改为与手动复制框同款的 admin-picker 弹窗；点遮罩或取消关闭。 -->
+    <div
+      v-if="deleteConfirm"
+      class="admin-picker-backdrop"
+      @click.self="closeDeleteConfirm">
+      <div class="admin-picker admin-delete-confirm">
+        <div class="admin-delete-confirm-head">
+          <span class="admin-delete-confirm-icon">!</span>
+          <h3>删除文件夹</h3>
+        </div>
+        <p class="admin-delete-confirm-name">{{ deleteConfirm.name }}</p>
+        <p class="admin-delete-confirm-desc">
+          其中包含 {{ deleteConfirm.info.count }} 个对象<span v-if="deleteConfirm.info.truncated">（仅统计前 1000 个）</span>，删除后无法恢复。
+        </p>
+        <ul
+          v-if="deleteConfirm.info.shares || deleteConfirm.info.permissions || deleteConfirm.info.protected"
+          class="admin-delete-confirm-list">
+          <li v-if="deleteConfirm.info.shares">关联的分享 {{ deleteConfirm.info.shares }} 个将被一并删除（含短链撤销）。</li>
+          <li v-if="deleteConfirm.info.permissions">关联的权限规则 {{ deleteConfirm.info.permissions }} 条将被一并删除。</li>
+          <li v-if="deleteConfirm.info.protected">其中 {{ deleteConfirm.info.protected }} 个子文件夹的保护将被一并解除。</li>
+        </ul>
+        <div class="admin-row admin-delete-confirm-actions">
+          <button @click="closeDeleteConfirm">取消</button>
+          <button
+            @click="confirmDeleteFolder"
+            :disabled="deleteConfirmBusy"
+            class="admin-btn-danger">{{ deleteConfirmBusy ? '删除中…' : '删除' }}</button>
+        </div>
+      </div>
+    </div>
   </div>
 </template>
 
@@ -895,6 +930,11 @@ export default {
     showManualCopy: false,
     manualCopyTitle: '',
     manualCopyText: '',
+    // 删除文件夹确认框：自定义弹窗替代原生 window.confirm。
+    // deleteConfirm 为 null 时不显示；非 null 时为
+    // { folder, name, info }，info 是 delete-folder preview 的回包。
+    deleteConfirm: null,
+    deleteConfirmBusy: false,
     shareBusy: false,
     shareFilterPrefix: 'all',
     shareFilterStatus: 'all',
@@ -1350,11 +1390,15 @@ export default {
       // 请求序号 guard：快速连点文件夹时，旧响应后到直接丢弃。
       // 不加缓存：上传/改名/移动/删除后每次都重新请求，数据一定新鲜；
       // 加载时旧列表保留在界面上（见模板），只换新数据。
+      // fetch 加 no-store：/api/children/ 不带显式 Cache-Control 时
+      // 浏览器可能启发式缓存 GET 响应，删除后重拉会拿到含已删文件
+      // 夹的旧列表（已删文件夹仍显示、点进去报「不存在」）；no-store
+      // 保证每次重拉都直达服务端。
       const seq = ++this.adminFetchSeq;
       this.filesLoading = true;
       this.filesError = '';
       try {
-        const res = await fetch(`/api/children/${this.cwd}`);
+        const res = await fetch(`/api/children/${this.cwd}`, { cache: 'no-store' });
         if (seq !== this.adminFetchSeq) return;
         if (res.status === 401) {
           this.goLogin('登录已失效，请重新登录');
@@ -1691,6 +1735,104 @@ export default {
       target: parent + name })) {
         this.actionOk = '已改名';
         this.fetchFilesAdmin();
+      }
+    },
+
+    // 删除文件夹：先向后端预览（只计数、不删除），把真实对象数
+    // 与关联的分享/权限/保护写进确认框；确认后才真正递归删除。
+    // 受保护的文件夹后端直接拒绝，前端据此提示先去取消保护。
+    async deleteFolderPreview(key) {
+      this.actionError = '';
+      try {
+        const res = await fetch('/api/admin/files/action', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ action: 'delete-folder', key, preview: true }),
+        });
+        if (res.status === 401) {
+          this.goLogin('登录已失效，请重新登录');
+          return null;
+        }
+        const data = await this.readJson(res);
+        if (!res.ok) {
+          this.actionError = this.deleteFolderErrorText(data && data.error);
+          return null;
+        }
+        return data;
+      } catch (e) {
+        this.actionError = '操作失败，请重试';
+        return null;
+      }
+    },
+
+    deleteFolderErrorText(code) {
+      if (code === 'protected_folder') {
+        return '该文件夹受保护，删除前请先在「受保护文件夹」页取消保护';
+      }
+      if (code === 'not_found') return '文件夹不存在或已被删除';
+      if (code === 'forbidden') return '没有删除权限';
+      if (code === 'invalid_key') return '文件夹路径无效';
+      return code ? `操作失败：${code}` : '操作失败，请重试';
+    },
+
+    // 删除文件夹：先向后端预览（只计数、不删除），把真实对象数
+    // 与关联的分享/权限/保护写进自定义确认框；点「删除」后才真正
+    // 递归删除。受保护的文件夹后端直接拒绝，前端据此提示先去取消保护。
+    async deleteFolder(prefix) {
+      const folder = prefix.replace(/\/$/, '');
+      const name = this.folderDisplayName(prefix);
+      const info = await this.deleteFolderPreview(folder);
+      if (!info) return;
+      this.deleteConfirmBusy = false;
+      this.deleteConfirm = { folder, name, info };
+    },
+
+    closeDeleteConfirm() {
+      if (this.deleteConfirmBusy) return;
+      this.deleteConfirm = null;
+    },
+
+    async confirmDeleteFolder() {
+      const pending = this.deleteConfirm;
+      if (!pending || this.deleteConfirmBusy) return;
+      this.deleteConfirmBusy = true;
+      this.actionError = '';
+      try {
+        const res = await fetch('/api/admin/files/action', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ action: 'delete-folder', key: pending.folder }),
+        });
+        if (res.status === 401) {
+          this.deleteConfirm = null;
+          this.deleteConfirmBusy = false;
+          this.goLogin('登录已失效，请重新登录');
+          return;
+        }
+        const data = await this.readJson(res);
+        if (!res.ok) {
+          this.deleteConfirm = null;
+          this.deleteConfirmBusy = false;
+          this.actionError = this.deleteFolderErrorText(data && data.error);
+          return;
+        }
+        this.actionOk = `已删除文件夹 ${pending.name}（${data.deleted || 0} 个对象）`
+          + (data.sinkFailures && data.sinkFailures.length
+            ? `，但 ${data.sinkFailures.length} 个短链未能撤销，请在短链管理里手动清理`
+            : '');
+        // 删除后列表立即刷新：先乐观地把该文件夹从当前列表里拿掉，
+        // 让它当场消失；再向服务端重拉一份权威列表对齐。
+        // 只乐观移除是不够的——若服务端重拉拿到的是浏览器缓存的旧
+        // 列表，已删文件夹会重新出现，所以重拉走 no-store。
+        const key = pending.folder + '/';
+        this.folders = (this.folders || []).filter((f) => f !== key);
+        this.deleteConfirm = null;
+        this.deleteConfirmBusy = false;
+        this.fetchFilesAdmin();
+      } catch (e) {
+        this.deleteConfirm = null;
+        this.deleteConfirmBusy = false;
+        this.actionError = '操作失败，请重试';
       }
     },
 
@@ -3911,6 +4053,67 @@ export default {
 .admin-picker h3 {
   margin: 0 0 12px;
   font-size: 16px;
+}
+/* 删除文件夹确认框：危险操作用红字标题 + 红色感叹号徽标，
+   与行内红色「删除」文字按钮同色系；确认删除是实心红按钮。 */
+.admin-delete-confirm {
+  max-width: 480px;
+}
+.admin-delete-confirm-head {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  margin-bottom: 12px;
+}
+.admin-delete-confirm-head h3 {
+  margin: 0;
+  color: #c00;
+}
+.admin-delete-confirm-icon {
+  flex: 0 0 auto;
+  width: 28px;
+  height: 28px;
+  line-height: 28px;
+  text-align: center;
+  font-size: 18px;
+  font-weight: 700;
+  color: #fff;
+  background: #c00;
+  border-radius: 50%;
+}
+.admin-delete-confirm-name {
+  margin: 0 0 8px;
+  font-size: 17px;
+  font-weight: 700;
+  word-break: break-all;
+}
+.admin-delete-confirm-desc {
+  margin: 0 0 8px;
+  color: #444;
+}
+.admin-delete-confirm-list {
+  margin: 0 0 16px;
+  padding-left: 20px;
+  color: #444;
+}
+.admin-delete-confirm-list li {
+  margin: 4px 0;
+}
+.admin-delete-confirm-actions {
+  justify-content: flex-end;
+}
+.admin-btn-danger {
+  padding: 10px 24px;
+  background: #c00;
+  color: #fff;
+  border: 0;
+  border-radius: 50px;
+  cursor: pointer;
+  box-shadow: 2px 4px 6px rgba(0, 0, 0, 0.3);
+}
+.admin-btn-danger:disabled {
+  opacity: 0.6;
+  cursor: default;
 }
 /* 选择行整行可点；选中态用更高特异性压过列表行的 hover 背景 */
 .admin-picker-row {
